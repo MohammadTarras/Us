@@ -316,6 +316,16 @@ st.markdown("""
     
     /* Mobile-First Responsive Design */
     @media (max-width: 768px) {
+        /* Force single column layout on mobile for chronological order */
+        .stColumns {
+            flex-direction: column !important;
+        }
+        
+        .stColumn {
+            width: 100% !important;
+            margin-bottom: 1rem;
+        }
+        
         .event-detail-container {
             padding: 0.5rem;
             width: 100%;
@@ -365,6 +375,7 @@ st.markdown("""
         .event-card {
             padding: 1.2rem;
             margin-bottom: 1rem;
+            width: 100%;
         }
         
         .card-title {

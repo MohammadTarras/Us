@@ -505,17 +505,15 @@ def display_event_details(event):
     ''', unsafe_allow_html=True)
 
 def create_event_cards(events):
-    """Create event cards using Streamlit columns for better compatibility"""
+    """Create event cards with proper mobile chronological ordering"""
     if not events:
         return
     
-    # Create columns based on number of events (max 3 per row)
-    num_cols = min(len(events), 3)
-    cols = st.columns(num_cols)
-    
+    # Use single column layout for proper chronological order on all devices
+    # This ensures events are always displayed in date order
     for i, event in enumerate(events):
-        with cols[i % num_cols]:
-            # Create clickable card using button
+        # Create a container for each event
+        with st.container():
             card_html = f'''
             <div class="event-card">
                 <div class="card-title">{event['title']}</div>
@@ -527,10 +525,10 @@ def create_event_cards(events):
             # Display the card HTML
             st.markdown(card_html, unsafe_allow_html=True)
             
-            # Add invisible button that spans the card area
-            if st.button(f"View {event['title']}", key=f"card_btn_{i}", 
+            # Add button for interaction
+            if st.button(f"View Details", key=f"card_btn_{i}", 
                         type="secondary", use_container_width=True,
-                        help="Click to view event details"):
+                        help=f"Click to view {event['title']}"):
                 st.session_state.selected_event = i
                 st.session_state.edit_mode = False
                 st.rerun()

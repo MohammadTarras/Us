@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
-from supabase import create_client, Client
+from supabase import create_client
 import hashlib
 import time
 

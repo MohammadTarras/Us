@@ -218,7 +218,7 @@ st.markdown("""
     
     /* Event Detail View */
     .event-detail-container {
-        max-width: 900px;
+        max-width: 1300px;
         margin: 0 auto;
         padding: 2rem;
     }

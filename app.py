@@ -668,11 +668,6 @@ def main():
     
     # Footer
     st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #7f8c8d; font-style: italic; font-family: 'Cairo', sans-serif;">
-        📅 Our Events - Beautiful timeline and event management system
-    </div>
-    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

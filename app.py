@@ -508,7 +508,7 @@ def create_event_cards(events):
             card_html = f'''
             <div class="event-card">
                 <div class="card-title">{event['title']}</div>
-                <div class="card-date">📅 {event['date'].strftime('%B %d, %Y')}</div>
+                <div class="card-date">{event['date'].strftime('%B %d, %Y')}</div>
                 <div class="card-preview">{event['preview']}</div>
             </div>
             '''

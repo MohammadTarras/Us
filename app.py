@@ -508,7 +508,7 @@ def create_event_cards(events):
             card_html = f'''
             <div class="event-card">
                 <div class="card-title">{event['title']}</div>
-                <div class="card-date">{event['date'].strftime('%B %d, %Y')}</div>
+                <div class="card-date">📅 {event['date'].strftime('%B %d, %Y')}</div>
                 <div class="card-preview">{event['preview']}</div>
             </div>
             '''
@@ -576,8 +576,25 @@ def main():
             st.session_state.edit_mode = False
             st.rerun()
     
-    # Load events from database
+    # Load events from database with smart caching
     events_data = load_events_from_db()
+    
+    # Add cache status indicator in development
+    if st.secrets.get("DEBUG_MODE", False):
+        with st.expander("🔧 Cache Status", expanded=False):
+            events_hash = get_events_hash()
+            st.write(f"Events Hash: {events_hash[:8] if events_hash else 'None'}...")
+            st.write(f"Events Count: {len(events_data)}")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔄 Refresh Events Cache"):
+                    invalidate_events_cache()
+                    st.rerun()
+            with col2:
+                if st.button("🗑️ Clear All Cache"):
+                    st.cache_data.clear()
+                    st.rerun()
     
     # Sidebar for event management
     with st.sidebar:
@@ -668,6 +685,11 @@ def main():
     
     # Footer
     st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #7f8c8d; font-style: italic; font-family: 'Cairo', sans-serif;">
+        📅 Our Events - Beautiful timeline and event management system
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

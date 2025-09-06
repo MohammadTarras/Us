@@ -4,6 +4,7 @@ from datetime import datetime, date
 from supabase import create_client
 import hashlib
 import time
+import re
 
 # Configure page
 st.set_page_config(
@@ -135,7 +136,12 @@ def create_user(username, password, email):
         st.error(f"Error creating user: {str(e)}")
         return False
 
-# Enhanced CSS with better card styling
+def is_arabic_text(text):
+    """Detect if text contains Arabic characters"""
+    arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+    return bool(arabic_pattern.search(text))
+
+# Enhanced CSS with better mobile optimization and Arabic support
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&display=swap');
@@ -216,22 +222,23 @@ st.markdown("""
         font-family: 'Cairo', sans-serif;
     }
     
-    /* Event Detail View */
+    /* Event Detail View - Enhanced for mobile */
     .event-detail-container {
-        max-width: 1300px;
+        max-width: 100%;
         margin: 0 auto;
-        padding: 2rem;
+        padding: 1rem;
     }
     
     .event-detail-card {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-radius: 25px;
-        padding: 3rem;
-        margin: 2rem 0;
+        padding: 2rem;
+        margin: 1rem 0;
         box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         color: #2c3e50;
         position: relative;
         overflow: hidden;
+        width: 100%;
     }
     
     .event-detail-title {
@@ -261,14 +268,22 @@ st.markdown("""
         line-height: 1.8;
         color: #2c3e50;
         font-family: 'Amiri', 'Cairo', serif;
-        text-align: justify;
         position: relative;
         z-index: 1;
         background: rgba(255, 255, 255, 0.7);
-        padding: 1.5rem;
+        padding: 2rem;
         border-radius: 15px;
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.3);
+        width: 100%;
+        box-sizing: border-box;
+        text-align: justify;
+    }
+    
+    .event-description.arabic {
+        direction: rtl;
+        text-align: right;
+        font-family: 'Amiri', 'Cairo', serif;
     }
     
     .no-events {
@@ -299,32 +314,102 @@ st.markdown("""
         font-family: 'Cairo', sans-serif;
     }
     
-    /* Responsive Design */
-    @media (max-width: 768px) {        
+    /* Mobile-First Responsive Design */
+    @media (max-width: 768px) {
+        .event-detail-container {
+            padding: 0.5rem;
+            width: 100%;
+        }
+        
+        .event-detail-card {
+            padding: 1.5rem;
+            margin: 0.5rem 0;
+            border-radius: 15px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
         .event-detail-title {
-            font-size: 2rem;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+        
+        .event-detail-meta {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .event-description {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            padding: 1.5rem;
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 10px;
         }
         
         .main-header {
             font-size: 2rem;
+            margin-bottom: 0.5rem;
         }
         
         .login-container {
-            margin: 1rem;
-            padding: 2rem;
+            margin: 1rem 0.5rem;
+            padding: 2rem 1.5rem;
+            width: calc(100% - 1rem);
+            box-sizing: border-box;
         }
         
         .event-card {
             padding: 1.2rem;
+            margin-bottom: 1rem;
         }
         
         .card-title {
             font-size: 1.2rem;
         }
         
-        .event-detail-card {
-            padding: 2rem;
+        .user-info {
+            padding: 0.8rem;
+            font-size: 0.9rem;
         }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 480px) {
+        .event-detail-container {
+            padding: 0.25rem;
+        }
+        
+        .event-detail-card {
+            padding: 1rem;
+            margin: 0.25rem 0;
+        }
+        
+        .event-detail-title {
+            font-size: 1.5rem;
+        }
+        
+        .event-description {
+            font-size: 1rem;
+            padding: 1rem;
+        }
+        
+        .main-header {
+            font-size: 1.8rem;
+        }
+    }
+    
+    /* Ensure full width usage */
+    .stApp > div > div > div > div {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    
+    .element-container {
+        width: 100% !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -390,7 +475,10 @@ def login_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def display_event_details(event):
-    """Display detailed view of selected event"""
+    """Display detailed view of selected event with Arabic text support"""
+    # Check if description contains Arabic text
+    arabic_class = "arabic" if is_arabic_text(event["description"]) else ""
+    
     st.markdown(f'''
     <div class="event-detail-container">
         <div class="event-detail-card">
@@ -398,7 +486,7 @@ def display_event_details(event):
             <div class="event-detail-meta">
                 📅 {event["date"].strftime("%B %d, %Y")}
             </div>
-            <div class="event-description">
+            <div class="event-description {arabic_class}">
                 {event["description"]}
             </div>
         </div>

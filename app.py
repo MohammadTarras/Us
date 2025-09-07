@@ -90,17 +90,6 @@ def update_event_in_db(event_id, title, event_date, preview, description):
         st.error(f"Error updating event: {str(e)}")
         return False
 
-def delete_event_from_db(event_id):
-    """Delete event from Supabase database"""
-    try:
-        supabase = init_supabase()
-        response = supabase.table('our_events').delete().eq('id', event_id).execute()
-        # Clear cache after successful delete
-        load_events_from_db.clear()
-        return True
-    except Exception as e:
-        st.error(f"Error deleting event: {str(e)}")
-        return False
 
 def hash_password(password):
     """Hash password using SHA-256"""
@@ -113,6 +102,12 @@ def authenticate_user(username, password):
     
     for user in users:
         if user['username'] == username and user['password_hash'] == hashed_password:
+            supabase = init_supabase()
+            response = supabase.table('logins').insert({
+                'username': username,
+
+            }).execute()
+            
             return True, user
     return False, None
 
@@ -588,23 +583,6 @@ def main():
     # Load events from database with smart caching
     events_data = load_events_from_db()
     
-    # Add cache status indicator in development
-    if st.secrets.get("DEBUG_MODE", False):
-        with st.expander("🔧 Cache Status", expanded=False):
-            events_hash = get_events_hash()
-            st.write(f"Events Hash: {events_hash[:8] if events_hash else 'None'}...")
-            st.write(f"Events Count: {len(events_data)}")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔄 Refresh Events Cache"):
-                    invalidate_events_cache()
-                    st.rerun()
-            with col2:
-                if st.button("🗑️ Clear All Cache"):
-                    st.cache_data.clear()
-                    st.rerun()
-    
     # Sidebar for event management
     with st.sidebar:
         st.header("📝 Event Management")
@@ -644,15 +622,6 @@ def main():
                             st.session_state.edit_mode = True
                             st.session_state.edit_event_id = event['id']
                             st.rerun()
-                    with col3:
-                        if st.button("🗑️", key=f"delete_{i}", help="Delete event"):
-                            success = delete_event_from_db(event['id'])
-                            if success:
-                                st.success("Event deleted!")
-                                if st.session_state.selected_event == i:
-                                    st.session_state.selected_event = None
-                                    st.session_state.edit_mode = False
-                                st.rerun()
                     st.divider()
     
     # Main content

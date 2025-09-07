@@ -609,14 +609,16 @@ def main():
             st.subheader("📋 Manage Events")
             for i, event in enumerate(events_data):
                 with st.container():
-                    st.write(f"**{event['title'][:20]}{'...' if len(event['title']) > 20 else ''}**")
                     col1, col2, col3 = st.columns(3)
                     with col1:
+                        st.write(f"**{event['title'][:20]}{'...' if len(event['title']) > 20 else ''}**")
+                    
+                    with col2:
                         if st.button("👁️", key=f"view_{i}", help="View event"):
                             st.session_state.selected_event = i
                             st.session_state.edit_mode = False
                             st.rerun()
-                    with col2:
+                    with col3:
                         if st.button("✏️", key=f"edit_{i}", help="Edit event"):
                             st.session_state.selected_event = i
                             st.session_state.edit_mode = True

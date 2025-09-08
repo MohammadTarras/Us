@@ -23,11 +23,27 @@ def init_supabase():
     """Initialize Supabase client with caching"""
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
+def set_user_context(username):
+    """Set the current user context for RLS policies"""
+    try:
+        supabase = init_supabase()
+        # Call the set_current_user function to set the context
+        supabase.rpc('set_current_user', {'user_name': username}).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error setting user context: {str(e)}")
+        return False
+
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_events_from_db():
+def load_events_from_db(username=None):
     """Load events from Supabase database with caching"""
     try:
         supabase = init_supabase()
+        
+        # Set user context for RLS
+        if username:
+            set_user_context(username)
+        
         response = supabase.table('our_events').select('*').order('event_date').execute()
         
         events = []
@@ -43,29 +59,40 @@ def load_events_from_db():
     except Exception as e:
         # For demo purposes, return sample data if database fails
         st.warning(f"Using sample data. Database error: {str(e)}")
-        
+        return []
 
 @st.cache_data(ttl=600)  # Cache for 10 minutes
 def load_users_from_db():
     """Load users from Supabase database with caching"""
     try:
         supabase = init_supabase()
+        # Note: With RLS enabled, this will only return the current user's record
         response = supabase.table('users').select('*').execute()
         return response.data
     except Exception as e:
         st.error(f"Error loading users: {str(e)}")
         return []
 
-def save_event_to_db(title, event_date, preview, description):
+def save_event_to_db(title, event_date, preview, description, username):
     """Save new event to Supabase database"""
     try:
         supabase = init_supabase()
+        
+        # Set user context for RLS
+        set_user_context(username)
+        
+        # Get user ID if you're using user-specific events
+        # user_response = supabase.table('users').select('id').eq('username', username).single().execute()
+        # user_id = user_response.data['id'] if user_response.data else None
+        
         response = supabase.table('our_events').insert({
             'event_title': title,
             'event_date': str(event_date),
             'preview_text': preview,
             'description': description
+            # 'user_id': user_id  # Uncomment if using user-specific events
         }).execute()
+        
         # Clear cache after successful save
         load_events_from_db.clear()
         return True
@@ -73,16 +100,21 @@ def save_event_to_db(title, event_date, preview, description):
         st.error(f"Error saving event: {str(e)}")
         return False
 
-def update_event_in_db(event_id, title, event_date, preview, description):
+def update_event_in_db(event_id, title, event_date, preview, description, username):
     """Update existing event in Supabase database"""
     try:
         supabase = init_supabase()
+        
+        # Set user context for RLS
+        set_user_context(username)
+        
         response = supabase.table('our_events').update({
             'event_title': title,
             'event_date': str(event_date),
             'preview_text': preview,
             'description': description
         }).eq('id', event_id).execute()
+        
         # Clear cache after successful update
         load_events_from_db.clear()
         return True
@@ -90,32 +122,48 @@ def update_event_in_db(event_id, title, event_date, preview, description):
         st.error(f"Error updating event: {str(e)}")
         return False
 
-
 def hash_password(password):
     """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def authenticate_user(username, password):
     """Authenticate user against database"""
-    users = load_users_from_db()
-    hashed_password = hash_password(password)
-    
-    for user in users:
-        if user['username'] == username and user['password_hash'] == hashed_password:
-            supabase = init_supabase()
-            response = supabase.table('logins').insert({
-                'username': username,
+    try:
+        supabase = init_supabase()
+        hashed_password = hash_password(password)
+        
+        # Query user with username and password
+        response = supabase.table('users').select('*').eq('username', username).eq('password_hash', hashed_password).execute()
 
+        
+        if response.data and len(response.data) > 0:
+            user = response.data[0]
+            
+            # Set user context for RLS
+            set_user_context(username)
+            
+            # Log the login
+            supabase.table('logins').insert({
+                'username': username,
             }).execute()
             
             return True, user
-    return False, None
+        return False, None
+    except Exception as e:
+        st.error(f"Authentication error: {str(e)}")
+        return False, None
 
 def create_user(username, password, email):
     """Create new user in database"""
     try:
         supabase = init_supabase()
         hashed_password = hash_password(password)
+        
+        # Check if username already exists
+        existing_user = supabase.table('users').select('username').eq('username', username).execute()
+        if existing_user.data:
+            st.error("Username already exists!")
+            return False
         
         response = supabase.table('users').insert({
             'username': username,
@@ -520,13 +568,16 @@ def create_event_cards(events):
             # Display the card HTML
             st.markdown(card_html, unsafe_allow_html=True)
             
-            # Add button for interaction
-            if st.button(f"View Details", key=f"card_btn_{i}", 
-                        type="secondary", use_container_width=True,
-                        help=f"Click to view {event['title']}"):
-                st.session_state.selected_event = i
-                st.session_state.edit_mode = False
-                st.rerun()
+            # Add buttons for interaction
+            col1 = st.columns([3, 1])
+            with col1:
+                if st.button(f"View Details", key=f"card_btn_{i}", 
+                            type="secondary", use_container_width=True,
+                            help=f"Click to view {event['title']}"):
+                    st.session_state.selected_event = i
+                    st.session_state.edit_mode = False
+                    st.rerun()
+           
 
 def edit_event_form(event, event_index):
     """Display form to edit existing event"""
@@ -542,7 +593,8 @@ def edit_event_form(event, event_index):
     with col1:
         if st.button("💾 Save Changes", type="primary", key=f"save_edit_{event_index}"):
             if edit_title and edit_preview and edit_description:
-                success = update_event_in_db(event['id'], edit_title, edit_date, edit_preview, edit_description)
+                success = update_event_in_db(event['id'], edit_title, edit_date, edit_preview, 
+                                           edit_description, st.session_state.user['username'])
                 if success:
                     st.success("✅ Event updated successfully!")
                     st.session_state.edit_mode = False
@@ -581,7 +633,7 @@ def main():
             st.rerun()
     
     # Load events from database with smart caching
-    events_data = load_events_from_db()
+    events_data = load_events_from_db(st.session_state.user['username'])
     
     # Sidebar for event management
     with st.sidebar:
@@ -597,7 +649,8 @@ def main():
             
             if st.button("Add Event", type="primary"):
                 if new_title and new_preview and new_description:
-                    success = save_event_to_db(new_title, new_date, new_preview, new_description)
+                    success = save_event_to_db(new_title, new_date, new_preview, 
+                                             new_description, st.session_state.user['username'])
                     if success:
                         st.success("✅ Event added successfully!")
                         st.rerun()

@@ -153,31 +153,31 @@ def authenticate_user(username, password):
         st.error(f"Authentication error: {str(e)}")
         return False, None
 
-def create_user(username, password, email):
-    """Create new user in database"""
-    try:
-        supabase = init_supabase()
-        hashed_password = hash_password(password)
+# def create_user(username, password, email):
+#     """Create new user in database"""
+#     try:
+#         supabase = init_supabase()
+#         hashed_password = hash_password(password)
         
-        # Check if username already exists
-        existing_user = supabase.table('users').select('username').eq('username', username).execute()
-        if existing_user.data:
-            st.error("Username already exists!")
-            return False
+#         # Check if username already exists
+#         existing_user = supabase.table('users').select('username').eq('username', username).execute()
+#         if existing_user.data:
+#             st.error("Username already exists!")
+#             return False
         
-        response = supabase.table('users').insert({
-            'username': username,
-            'email': email,
-            'password_hash': hashed_password,
-            'created_at': datetime.now().isoformat()
-        }).execute()
+#         response = supabase.table('users').insert({
+#             'username': username,
+#             'email': email,
+#             'password_hash': hashed_password,
+#             'created_at': datetime.now().isoformat()
+#         }).execute()
         
-        # Clear users cache
-        load_users_from_db.clear()
-        return True
-    except Exception as e:
-        st.error(f"Error creating user: {str(e)}")
-        return False
+#         # Clear users cache
+#         load_users_from_db.clear()
+#         return True
+#     except Exception as e:
+#         st.error(f"Error creating user: {str(e)}")
+#         return False
 
 def is_arabic_text(text):
     """Detect if text contains Arabic characters"""
@@ -485,48 +485,48 @@ def login_page():
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
     st.markdown('<h1 class="login-header">🔐 Login</h1>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["Login", "Register"])
+    #tab1, tab2 = st.tabs(["Login", "Register"])
     
-    with tab1:
-        st.subheader("Sign In")
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
-        
-        if st.button("Login", type="primary", use_container_width=True):
-            if username and password:
-                success, user = authenticate_user(username, password)
-                if success:
-                    st.session_state.authenticated = True
-                    st.session_state.user = user
-                    st.success("✅ Login successful!")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("❌ Invalid username or password")
+   # with tab1:
+    st.subheader("Sign In")
+    username = st.text_input("Username", key="login_username")
+    password = st.text_input("Password", type="password", key="login_password")
+    
+    if st.button("Login", type="primary", use_container_width=True):
+        if username and password:
+            success, user = authenticate_user(username, password)
+            if success:
+                st.session_state.authenticated = True
+                st.session_state.user = user
+                st.success("✅ Login successful!")
+                time.sleep(1)
+                st.rerun()
             else:
-                st.error("Please enter both username and password")
+                st.error("❌ Invalid username or password")
+        else:
+            st.error("Please enter both username and password")
     
-    with tab2:
-        st.subheader("Create Account")
-        new_username = st.text_input("Username", key="reg_username")
-        new_email = st.text_input("Email", key="reg_email")
-        new_password = st.text_input("Password", type="password", key="reg_password")
-        confirm_password = st.text_input("Confirm Password", type="password", key="reg_confirm")
+    # with tab2:
+    #     st.subheader("Create Account")
+    #     new_username = st.text_input("Username", key="reg_username")
+    #     new_email = st.text_input("Email", key="reg_email")
+    #     new_password = st.text_input("Password", type="password", key="reg_password")
+    #     confirm_password = st.text_input("Confirm Password", type="password", key="reg_confirm")
         
-        if st.button("Create Account", type="primary", use_container_width=True):
-            if new_username and new_email and new_password and confirm_password:
-                if new_password == confirm_password:
-                    success = create_user(new_username, new_password, new_email)
-                    if success:
-                        st.success("✅ Account created! Please login.")
-                    else:
-                        st.error("❌ Error creating account")
-                else:
-                    st.error("❌ Passwords don't match")
-            else:
-                st.error("Please fill in all fields")
+    #     if st.button("Create Account", type="primary", use_container_width=True):
+    #         if new_username and new_email and new_password and confirm_password:
+    #             if new_password == confirm_password:
+    #                 success = create_user(new_username, new_password, new_email)
+    #                 if success:
+    #                     st.success("✅ Account created! Please login.")
+    #                 else:
+    #                     st.error("❌ Error creating account")
+    #             else:
+    #                 st.error("❌ Passwords don't match")
+    #         else:
+    #             st.error("Please fill in all fields")
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    # st.markdown('</div>', unsafe_allow_html=True)
 
 def display_event_details(event):
     """Display detailed view of selected event with Arabic text support"""

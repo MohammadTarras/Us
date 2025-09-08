@@ -568,15 +568,13 @@ def create_event_cards(events):
             # Display the card HTML
             st.markdown(card_html, unsafe_allow_html=True)
             
-            # Add buttons for interaction
-            col1 = st.columns([3, 1])
-            with col1:
-                if st.button(f"View Details", key=f"card_btn_{i}", 
-                            type="secondary", use_container_width=True,
-                            help=f"Click to view {event['title']}"):
-                    st.session_state.selected_event = i
-                    st.session_state.edit_mode = False
-                    st.rerun()
+  
+            if st.button(f"View Details", key=f"card_btn_{i}", 
+                        type="secondary", use_container_width=True,
+                        help=f"Click to view {event['title']}"):
+                st.session_state.selected_event = i
+                st.session_state.edit_mode = False
+                st.rerun()
            
 
 def edit_event_form(event, event_index):

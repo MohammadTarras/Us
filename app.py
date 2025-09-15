@@ -123,7 +123,7 @@ def load_events_from_db(username):
         supabase = init_supabase()
         set_user_context(username)
         
-        response = supabase.table('our_events').select('*').order('event_date').execute()
+        response = supabase.table('our_events').select('*').eq('enabled', True).order('event_date').execute()
         
         events = []
         for event in response.data:
@@ -184,14 +184,20 @@ def delete_event_from_db(event_id, username):
     try:
         supabase = init_supabase()
         set_user_context(username)
-        
-        response = supabase.table('our_events').delete().eq('id', event_id).execute()
-        
-        # Clear cache after successful delete
+
+        # Update enabled field instead of deleting
+        response = (
+            supabase.table('our_events')
+            .update({"enabled": False})
+            .eq('id', event_id)
+            .execute()
+        )
+
+        # Clear cache after successful update
         load_events_from_db.clear()
         return True
     except Exception as e:
-        st.error(f"Error deleting event: {str(e)}")
+        st.error(f"Error disabling event: {str(e)}")
         return False
 
 def hash_password(password):

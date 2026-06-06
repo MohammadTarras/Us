@@ -27,7 +27,7 @@ COUPLE_NAMES = {
 }
 
 COUPLE_EMAILS = {
-    "shahed": "",
+    "shahed": "shahedsobbahi@gmail.com",
     "mohammad": "altarrasm2001@gmail.com"
 }
 

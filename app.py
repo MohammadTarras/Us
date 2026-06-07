@@ -792,10 +792,15 @@ footer,
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
 [data-testid="stHeader"],
-[data-testid="stSidebarNav"],
 button[kind="header"] {
     display: none !important;
     visibility: hidden !important;
+}
+
+/* Keep sidebar nav visible for mobile */
+[data-testid="stSidebarNav"] {
+    display: block !important;
+    visibility: visible !important;
 }
 
 .stApp {
@@ -804,6 +809,20 @@ button[kind="header"] {
 
 .block-container {
     padding-top: 0rem !important;
+}
+
+/* Mobile responsive sidebar */
+@media (max-width: 768px) {
+    [data-testid="stSidebar"] {
+        width: 250px !important;
+        transform: translateX(0) !important;
+    }
+    
+    /* Ensure sidebar button is visible on mobile */
+    button[data-testid="collapseSidebarButton"] {
+        display: block !important;
+        visibility: visible !important;
+    }
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lato:wght@300;400;700&family=Cairo:wght@300;400;600&display=swap');

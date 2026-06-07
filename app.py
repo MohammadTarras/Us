@@ -785,19 +785,31 @@ def inject_css():
 
 /* ───────────────── STREAMLIT CLEANUP ───────────────── */
 
-#MainMenu,
-header,
 footer,
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
-[data-testid="stHeader"],
 button[kind="header"] {
     display: none !important;
     visibility: hidden !important;
 }
 
-/* Keep sidebar nav visible for mobile */
+/* Show the menu on mobile - don't hide it */
+#MainMenu,
+header {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Hide header on desktop only */
+@media (min-width: 769px) {
+    #MainMenu,
+    header {
+        display: none !important;
+        visibility: hidden !important;
+    }
+}
+
 [data-testid="stSidebarNav"] {
     display: block !important;
     visibility: visible !important;
@@ -813,15 +825,12 @@ button[kind="header"] {
 
 /* Mobile responsive sidebar */
 @media (max-width: 768px) {
-    [data-testid="stSidebar"] {
-        width: 250px !important;
-        transform: translateX(0) !important;
+    .stApp {
+        margin-top: 0 !important;
     }
     
-    /* Ensure sidebar button is visible on mobile */
-    button[data-testid="collapseSidebarButton"] {
-        display: block !important;
-        visibility: visible !important;
+    [data-testid="stSidebar"] {
+        width: 250px !important;
     }
 }
 

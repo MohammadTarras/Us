@@ -1601,6 +1601,142 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   letter-spacing: 0.5px;
 }
 
+/* ─── MOBILE SIDEBAR MENU ──────────────────────────────── */
+.mobile-menu-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1000;
+  display: none;
+  background: var(--rose) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0.6rem 0.8rem !important;
+  font-size: 1.2rem !important;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(212,133,122,0.3);
+}
+
+.mobile-menu-toggle:hover {
+  background: var(--rose-deep) !important;
+}
+
+.mobile-sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 999;
+  display: none;
+}
+
+.mobile-sidebar-overlay.active {
+  display: block;
+}
+
+.mobile-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  background: linear-gradient(180deg, #fff5f0 0%, var(--sidebar) 100%);
+  border-right: 1px solid var(--border);
+  z-index: 1001;
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+}
+
+.mobile-sidebar.active {
+  transform: translateX(0);
+}
+
+.mobile-sidebar-content {
+  padding: 1rem;
+}
+
+.mobile-menu-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent !important;
+  border: none !important;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text) !important;
+  padding: 0 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.mobile-menu-close:hover {
+  opacity: 0.7;
+}
+
+.mobile-sidebar-item {
+  margin: 0.8rem 0;
+}
+
+.mobile-sidebar-item button {
+  width: 100% !important;
+  text-align: left !important;
+  padding: 0.8rem 1rem !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
+  background: white !important;
+  color: var(--text) !important;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobile-sidebar-item button:hover {
+  background: var(--blush) !important;
+  border-color: var(--rose) !important;
+  color: white !important;
+}
+
+.mobile-sidebar-item button.primary {
+  background: var(--rose) !important;
+  color: white !important;
+  border-color: var(--rose) !important;
+}
+
+.mobile-sidebar-item button.primary:hover {
+  background: var(--rose-deep) !important;
+}
+
+.mobile-sidebar-section {
+  margin: 1.5rem 0;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-sidebar-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 1rem 0 0.5rem;
+  font-weight: 600;
+}
+
+/* Show mobile menu on small screens */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: block;
+  }
+  
+  .main .block-container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
 @media (max-width:600px) {
   .event-card { flex-direction:column; }
   .event-card-thumb { width:100%; min-width:100%; height:170px; }
@@ -1612,6 +1748,8 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   .detail-hero { height: 200px; }
   .filter-label { font-size: 0.8rem; }
   .search-filter-box { padding: 1rem; }
+  
+  .main .block-container { padding-top: 1rem; max-width: 100%; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -1696,6 +1834,121 @@ def login_page():
                     st.error("Please fill in both fields.")
 
         st.markdown('</div>', unsafe_allow_html=True)
+
+
+def display_mobile_sidebar():
+    """Display collapsible mobile sidebar menu."""
+    today = date.today()
+    days = (today - START_DATE).days
+    username = st.session_state.user.get('username', '').lower()
+    display_name = COUPLE_NAMES.get(username, username.title())
+    
+    # Initialize mobile menu state
+    if 'mobile_menu_open' not in st.session_state:
+        st.session_state.mobile_menu_open = False
+    
+    # Toggle button
+    st.markdown("""
+    <button class="mobile-menu-toggle" onclick="
+        const sidebar = document.querySelector('.mobile-sidebar');
+        const overlay = document.querySelector('.mobile-sidebar-overlay');
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    ">☰</button>
+    """, unsafe_allow_html=True)
+    
+    # Overlay
+    st.markdown('<div class="mobile-sidebar-overlay" onclick="this.classList.remove(\'active\'); document.querySelector(\'.mobile-sidebar\').classList.remove(\'active\');"></div>', unsafe_allow_html=True)
+    
+    # Mobile sidebar
+    st.markdown(f"""
+    <div class="mobile-sidebar">
+        <div class="mobile-sidebar-content">
+            <button class="mobile-menu-close" onclick="
+                document.querySelector('.mobile-sidebar').classList.remove('active');
+                document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+            ">✕</button>
+            
+            <!-- Logo -->
+            <div style="text-align:center; padding: 1rem 0; margin-bottom: 1rem;">
+                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">❤️</div>
+                <h2 style="font-family:'Playfair Display',serif; color: var(--rose); margin: 0; font-size: 1.4rem;">M & S</h2>
+                <p style="font-size: 0.75rem; color: var(--muted); margin: 0.3rem 0 0;">Mohammad & Shahed</p>
+            </div>
+            
+            <!-- Days Counter -->
+            <div style="background: linear-gradient(135deg, #d4857a 0%, #c9866b 100%); border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; color: white;">
+                <div style="font-family:'Playfair Display',serif; font-size: 2rem; font-weight: 700; line-height: 1;">{days}</div>
+                <div style="font-size: 0.7rem; letter-spacing: 0.5px; margin-top: 0.3rem;">days of us 🌸</div>
+            </div>
+            
+            <!-- Welcome Pill -->
+            <div style="background: rgba(255,255,255,0.8); border: 1px solid var(--border); border-radius: 20px; padding: 0.6rem 1rem; text-align: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
+                Welcome, <strong style="color: var(--rose);">{display_name}</strong> ✨
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">
+            
+            <!-- Add Memory Button -->
+            <div class="mobile-sidebar-item">
+                <button class="primary" onclick="
+                    window.streamlit.setComponentValue(true, 'add_memory');
+                    document.querySelector('.mobile-sidebar').classList.remove('active');
+                    document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+                ">➕ Add Memory</button>
+            </div>
+            
+            <!-- View Mode Section -->
+            <div class="mobile-sidebar-section">
+                <div class="mobile-sidebar-label">📋 View Mode</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <div class="mobile-sidebar-item">
+                        <button onclick="
+                            window.streamlit.setComponentValue('timeline', 'view_mode');
+                            document.querySelector('.mobile-sidebar').classList.remove('active');
+                            document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+                        ">📅 Timeline</button>
+                    </div>
+                    <div class="mobile-sidebar-item">
+                        <button onclick="
+                            window.streamlit.setComponentValue('gallery', 'view_mode');
+                            document.querySelector('.mobile-sidebar').classList.remove('active');
+                            document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+                        ">🖼️ Gallery</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Today's Memories Section -->
+            <div class="mobile-sidebar-section">
+                <div class="mobile-sidebar-label">📬 Today's Memories</div>
+                <div class="mobile-sidebar-item">
+                    <button class="primary" onclick="
+                        window.streamlit.setComponentValue('send', 'reminder_action');
+                        document.querySelector('.mobile-sidebar').classList.remove('active');
+                        document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+                    ">Send</button>
+                </div>
+                <div class="mobile-sidebar-item">
+                    <button onclick="
+                        window.streamlit.setComponentValue('resend', 'reminder_action');
+                        document.querySelector('.mobile-sidebar').classList.remove('active');
+                        document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
+                    ">Resend</button>
+                </div>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">
+            
+            <!-- Sign Out Button -->
+            <div class="mobile-sidebar-item">
+                <button onclick="
+                    window.streamlit.setComponentValue(true, 'logout');
+                ">🚪 Sign out</button>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 def display_sidebar():
@@ -2174,6 +2427,9 @@ def edit_event_form(event):
 
 def show_events_page():
     EVENTS_PER_PAGE = 8
+    
+    # Display mobile sidebar menu on mobile devices
+    display_mobile_sidebar()
 
     st.markdown("""
     <div class="page-hero">

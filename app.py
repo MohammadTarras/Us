@@ -1579,147 +1579,7 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 }
 
 /* ─── MOBILE SIDEBAR MENU ──────────────────────────────── */
-.mobile-menu-toggle {
-  position: fixed;
-  top: 0.8rem;
-  left: 0.8rem;
-  z-index: 2000;
-  display: none;
-  background: var(--rose) !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 8px !important;
-  padding: 0.8rem 1rem !important;
-  font-size: 1.3rem !important;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(212,133,122,0.4);
-  min-width: 50px;
-  min-height: 50px;
-}
-
-.mobile-menu-toggle:hover {
-  background: var(--rose-deep) !important;
-  box-shadow: 0 6px 16px rgba(212,133,122,0.5);
-}
-
-.mobile-menu-toggle:active {
-  transform: scale(0.95);
-}
-
-.mobile-sidebar-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  z-index: 1500;
-  display: none;
-}
-
-.mobile-sidebar-overlay.active {
-  display: block;
-}
-
-.mobile-sidebar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 280px;
-  background: linear-gradient(180deg, #fff5f0 0%, var(--sidebar) 100%);
-  border-right: 1px solid var(--border);
-  z-index: 1501;
-  overflow-y: auto;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 4px 0 16px rgba(0,0,0,0.15);
-}
-
-.mobile-sidebar.active {
-  transform: translateX(0);
-}
-
-.mobile-sidebar-content {
-  padding: 1rem;
-  padding-top: 2rem;
-}
-
-.mobile-menu-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: transparent !important;
-  border: none !important;
-  font-size: 1.8rem;
-  cursor: pointer;
-  color: var(--text) !important;
-  padding: 0 !important;
-  width: auto !important;
-  height: auto !important;
-  line-height: 1 !important;
-}
-
-.mobile-menu-close:hover {
-  opacity: 0.6;
-}
-
-.mobile-sidebar-item {
-  margin: 0.8rem 0;
-}
-
-.mobile-sidebar-item button {
-  width: 100% !important;
-  text-align: left !important;
-  padding: 0.8rem 1rem !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--border) !important;
-  background: white !important;
-  color: var(--text) !important;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: inherit !important;
-  font-size: 0.95rem !important;
-}
-
-.mobile-sidebar-item button:hover {
-  background: var(--blush) !important;
-  border-color: var(--rose) !important;
-  color: white !important;
-}
-
-.mobile-sidebar-item button.primary {
-  background: var(--rose) !important;
-  color: white !important;
-  border-color: var(--rose) !important;
-}
-
-.mobile-sidebar-item button.primary:hover {
-  background: var(--rose-deep) !important;
-  border-color: var(--rose-deep) !important;
-}
-
-.mobile-sidebar-section {
-  margin: 1.5rem 0;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.mobile-sidebar-label {
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 1rem 0 0.8rem;
-  font-weight: 600;
-}
-
-/* Show mobile menu on small screens */
-@media (max-width: 768px) {
-  .mobile-menu-toggle {
-    display: block;
-  }
-}
+/* Using Streamlit buttons - no custom HTML CSS needed */
 
 @media (max-width:600px) {
   .event-card { flex-direction:column; }
@@ -1831,108 +1691,97 @@ def display_mobile_sidebar():
     if 'mobile_menu_open' not in st.session_state:
         st.session_state.mobile_menu_open = False
     
-    # Toggle button
-    st.markdown("""
-    <button class="mobile-menu-toggle" onclick="
-        const sidebar = document.querySelector('.mobile-sidebar');
-        const overlay = document.querySelector('.mobile-sidebar-overlay');
-        sidebar.classList.toggle('active');
-        overlay.classList.toggle('active');
-    ">☰</button>
-    """, unsafe_allow_html=True)
+    # Toggle button at top
+    col1, col2 = st.columns([0.15, 1])
+    with col1:
+        if st.button("☰", key="toggle_mobile_menu_btn", help="Open menu"):
+            st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
+            st.rerun()
     
-    # Overlay
-    st.markdown('<div class="mobile-sidebar-overlay" onclick="this.classList.remove(\'active\'); document.querySelector(\'.mobile-sidebar\').classList.remove(\'active\');"></div>', unsafe_allow_html=True)
-    
-    # Mobile sidebar
-    st.markdown(f"""
-    <div class="mobile-sidebar">
-        <div class="mobile-sidebar-content">
-            <button class="mobile-menu-close" onclick="
-                document.querySelector('.mobile-sidebar').classList.remove('active');
-                document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-            ">✕</button>
+    # Show sidebar if open
+    if st.session_state.mobile_menu_open:
+        # Use a container for the menu
+        with st.container():
+            # Logo section
+            col_logo = st.columns([1])[0]
+            with col_logo:
+                st.markdown("""
+                <div style="text-align:center; padding: 1rem 0; margin-bottom: 1rem;">
+                    <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">❤️</div>
+                    <h2 style="font-family:'Playfair Display',serif; color: var(--rose); margin: 0; font-size: 1.4rem;">M & S</h2>
+                    <p style="font-size: 0.75rem; color: var(--muted); margin: 0.3rem 0 0;">Mohammad & Shahed</p>
+                </div>
+                """, unsafe_allow_html=True)
             
-            <!-- Logo -->
-            <div style="text-align:center; padding: 1rem 0; margin-bottom: 1rem;">
-                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">❤️</div>
-                <h2 style="font-family:'Playfair Display',serif; color: var(--rose); margin: 0; font-size: 1.4rem;">M & S</h2>
-                <p style="font-size: 0.75rem; color: var(--muted); margin: 0.3rem 0 0;">Mohammad & Shahed</p>
-            </div>
-            
-            <!-- Days Counter -->
+            # Days counter
+            st.markdown(f"""
             <div style="background: linear-gradient(135deg, #d4857a 0%, #c9866b 100%); border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; color: white;">
                 <div style="font-family:'Playfair Display',serif; font-size: 2rem; font-weight: 700; line-height: 1;">{days}</div>
                 <div style="font-size: 0.7rem; letter-spacing: 0.5px; margin-top: 0.3rem;">days of us 🌸</div>
             </div>
+            """, unsafe_allow_html=True)
             
-            <!-- Welcome Pill -->
+            # Welcome pill
+            st.markdown(f"""
             <div style="background: rgba(255,255,255,0.8); border: 1px solid var(--border); border-radius: 20px; padding: 0.6rem 1rem; text-align: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
                 Welcome, <strong style="color: var(--rose);">{display_name}</strong> ✨
             </div>
+            """, unsafe_allow_html=True)
             
-            <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">
-            
-            <!-- Add Memory Button -->
-            <div class="mobile-sidebar-item">
-                <button class="primary" onclick="
-                    window.streamlit.setComponentValue(true, 'add_memory');
-                    document.querySelector('.mobile-sidebar').classList.remove('active');
-                    document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-                ">➕ Add Memory</button>
-            </div>
-            
-            <!-- View Mode Section -->
-            <div class="mobile-sidebar-section">
-                <div class="mobile-sidebar-label">📋 View Mode</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                    <div class="mobile-sidebar-item">
-                        <button onclick="
-                            window.streamlit.setComponentValue('timeline', 'view_mode');
-                            document.querySelector('.mobile-sidebar').classList.remove('active');
-                            document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-                        ">📅 Timeline</button>
-                    </div>
-                    <div class="mobile-sidebar-item">
-                        <button onclick="
-                            window.streamlit.setComponentValue('gallery', 'view_mode');
-                            document.querySelector('.mobile-sidebar').classList.remove('active');
-                            document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-                        ">🖼️ Gallery</button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Today's Memories Section -->
-            <div class="mobile-sidebar-section">
-                <div class="mobile-sidebar-label">📬 Today's Memories</div>
-                <div class="mobile-sidebar-item">
-                    <button class="primary" onclick="
-                        window.streamlit.setComponentValue('send', 'reminder_action');
-                        document.querySelector('.mobile-sidebar').classList.remove('active');
-                        document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-                    ">Send</button>
-                </div>
-                <div class="mobile-sidebar-item">
-                    <button onclick="
-                        window.streamlit.setComponentValue('resend', 'reminder_action');
-                        document.querySelector('.mobile-sidebar').classList.remove('active');
-                        document.querySelector('.mobile-sidebar-overlay').classList.remove('active');
-                    ">Resend</button>
-                </div>
-            </div>
-            
-            <hr style="border: none; border-top: 1px solid var(--border); margin: 1rem 0;">
-            
-            <!-- Sign Out Button -->
-            <div class="mobile-sidebar-item">
-                <button onclick="
-                    window.streamlit.setComponentValue(true, 'logout');
-                ">🚪 Sign out</button>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+            st.divider()
+        
+        # Add Memory Button
+        if st.button("➕ Add Memory", use_container_width=True, type="primary", key="mobile_add_mem"):
+            st.session_state.show_add_form = True
+            st.session_state.selected_event = None
+            st.session_state.edit_event_id = None
+            st.session_state.mobile_menu_open = False
+            st.rerun()
+        
+        st.markdown("**📋 View Mode**")
+        view_col1, view_col2 = st.columns(2)
+        with view_col1:
+            if st.button("📅 Timeline", 
+                        type="primary" if st.session_state.view_mode == 'timeline' else "secondary",
+                        use_container_width=True, key="mobile_timeline"):
+                st.session_state.view_mode = 'timeline'
+                st.session_state.mobile_menu_open = False
+                st.rerun()
+        with view_col2:
+            if st.button("🖼️ Gallery", 
+                        type="primary" if st.session_state.view_mode == 'gallery' else "secondary",
+                        use_container_width=True, key="mobile_gallery"):
+                st.session_state.view_mode = 'gallery'
+                st.session_state.mobile_menu_open = False
+                st.rerun()
+        
+        st.markdown("**📬 Today's Memories**")
+        col_send, col_resend = st.columns(2)
+        with col_send:
+            if st.button("Send", use_container_width=True, type="primary", key="mobile_send"):
+                with st.spinner("Sending..."):
+                    n = send_today_reminders(force=False)
+                    if n:
+                        st.success(f"✉️ {n} memory/memories sent!")
+                    else:
+                        st.info("Already sent today — use Resend to send again.")
+                st.session_state.mobile_menu_open = False
+                st.rerun()
+        with col_resend:
+            if st.button("Resend", use_container_width=True, key="mobile_resend"):
+                with st.spinner("Resending..."):
+                    n = send_today_reminders(force=True)
+                    if n:
+                        st.success(f"✉️ Resent {n} memory/memories!")
+                    else:
+                        st.info("No memories found for today's date.")
+                st.session_state.mobile_menu_open = False
+                st.rerun()
+        
+        st.divider()
+        
+        if st.button("🚪 Sign out", use_container_width=True, key="mobile_logout"):
+            logout()
 
 
 def display_sidebar():
@@ -1965,7 +1814,7 @@ def display_sidebar():
 
         st.markdown("---")
 
-        if st.button("➕  Add Memory", type="primary", use_container_width=True):
+        if st.button("➕  Add Memory", type="primary", use_container_width=True, key="sidebar_add_memory"):
             st.session_state.show_add_form = True
             st.session_state.selected_event = None
             st.session_state.edit_event_id = None
@@ -1979,13 +1828,13 @@ def display_sidebar():
         with view_col1:
             if st.button("📅 Timeline", 
                         type="primary" if st.session_state.view_mode == 'timeline' else "secondary",
-                        use_container_width=True):
+                        use_container_width=True, key="sidebar_timeline"):
                 st.session_state.view_mode = 'timeline'
                 st.rerun()
         with view_col2:
             if st.button("🖼️ Gallery", 
                         type="primary" if st.session_state.view_mode == 'gallery' else "secondary",
-                        use_container_width=True):
+                        use_container_width=True, key="sidebar_gallery"):
                 st.session_state.view_mode = 'gallery'
                 st.rerun()
 
@@ -1996,7 +1845,7 @@ def display_sidebar():
         st.caption("Send all memories from this day (any year) to both of you.")
         col_a, col_b = st.columns(2)
         with col_a:
-            if st.button("Send", use_container_width=True, type="primary"):
+            if st.button("Send", use_container_width=True, type="primary", key="sidebar_send"):
                 with st.spinner("Sending..."):
                     n = send_today_reminders(force=False)
                     if n:
@@ -2004,7 +1853,7 @@ def display_sidebar():
                     else:
                         st.info("Already sent today — use Resend to send again.")
         with col_b:
-            if st.button("Resend", use_container_width=True):
+            if st.button("Resend", use_container_width=True, key="sidebar_resend"):
                 with st.spinner("Resending..."):
                     n = send_today_reminders(force=True)
                     if n:
@@ -2014,7 +1863,7 @@ def display_sidebar():
 
         st.markdown("---")
 
-        if st.button("🚪  Sign out", use_container_width=True):
+        if st.button("🚪  Sign out", use_container_width=True, key="sidebar_logout"):
             logout()
 
 
@@ -2629,6 +2478,7 @@ def main():
         except Exception:
             pass
 
+    # Show desktop sidebar only (mobile sidebar is in show_events_page)
     display_sidebar()
     show_events_page()
 

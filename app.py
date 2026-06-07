@@ -785,53 +785,30 @@ def inject_css():
 
 /* ───────────────── STREAMLIT CLEANUP ───────────────── */
 
+#MainMenu,
+header,
 footer,
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
+[data-testid="stHeader"],
+[data-testid="stSidebarNav"],
 button[kind="header"] {
     display: none !important;
     visibility: hidden !important;
 }
 
-/* Show the menu on mobile - don't hide it */
-#MainMenu,
-header {
-    display: block !important;
-    visibility: visible !important;
-}
-
-/* Hide header on desktop only */
-@media (min-width: 769px) {
-    #MainMenu,
-    header {
-        display: none !important;
-        visibility: hidden !important;
-    }
-}
-
-[data-testid="stSidebarNav"] {
-    display: block !important;
-    visibility: visible !important;
+[data-testid="stSidebar"] {
+    display: none !important;
 }
 
 .stApp {
-    margin-top: -4rem;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 .block-container {
     padding-top: 0rem !important;
-}
-
-/* Mobile responsive sidebar */
-@media (max-width: 768px) {
-    .stApp {
-        margin-top: 0 !important;
-    }
-    
-    [data-testid="stSidebar"] {
-        width: 250px !important;
-    }
 }
 
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lato:wght@300;400;700&family=Cairo:wght@300;400;600&display=swap');
@@ -1604,22 +1581,29 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 /* ─── MOBILE SIDEBAR MENU ──────────────────────────────── */
 .mobile-menu-toggle {
   position: fixed;
-  top: 1rem;
-  left: 1rem;
-  z-index: 1000;
+  top: 0.8rem;
+  left: 0.8rem;
+  z-index: 2000;
   display: none;
   background: var(--rose) !important;
   color: white !important;
   border: none !important;
   border-radius: 8px !important;
-  padding: 0.6rem 0.8rem !important;
-  font-size: 1.2rem !important;
+  padding: 0.8rem 1rem !important;
+  font-size: 1.3rem !important;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(212,133,122,0.3);
+  box-shadow: 0 4px 12px rgba(212,133,122,0.4);
+  min-width: 50px;
+  min-height: 50px;
 }
 
 .mobile-menu-toggle:hover {
   background: var(--rose-deep) !important;
+  box-shadow: 0 6px 16px rgba(212,133,122,0.5);
+}
+
+.mobile-menu-toggle:active {
+  transform: scale(0.95);
 }
 
 .mobile-sidebar-overlay {
@@ -1628,8 +1612,8 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.4);
-  z-index: 999;
+  background: rgba(0,0,0,0.5);
+  z-index: 1500;
   display: none;
 }
 
@@ -1645,11 +1629,11 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   width: 280px;
   background: linear-gradient(180deg, #fff5f0 0%, var(--sidebar) 100%);
   border-right: 1px solid var(--border);
-  z-index: 1001;
+  z-index: 1501;
   overflow-y: auto;
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
-  box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 16px rgba(0,0,0,0.15);
 }
 
 .mobile-sidebar.active {
@@ -1658,6 +1642,7 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 
 .mobile-sidebar-content {
   padding: 1rem;
+  padding-top: 2rem;
 }
 
 .mobile-menu-close {
@@ -1666,16 +1651,17 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   right: 1rem;
   background: transparent !important;
   border: none !important;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
   color: var(--text) !important;
   padding: 0 !important;
   width: auto !important;
   height: auto !important;
+  line-height: 1 !important;
 }
 
 .mobile-menu-close:hover {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .mobile-sidebar-item {
@@ -1692,6 +1678,8 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   color: var(--text) !important;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: inherit !important;
+  font-size: 0.95rem !important;
 }
 
 .mobile-sidebar-item button:hover {
@@ -1708,6 +1696,7 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 
 .mobile-sidebar-item button.primary:hover {
   background: var(--rose-deep) !important;
+  border-color: var(--rose-deep) !important;
 }
 
 .mobile-sidebar-section {
@@ -1721,7 +1710,7 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin: 1rem 0 0.5rem;
+  margin: 1rem 0 0.8rem;
   font-weight: 600;
 }
 
@@ -1729,11 +1718,6 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 @media (max-width: 768px) {
   .mobile-menu-toggle {
     display: block;
-  }
-  
-  .main .block-container {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
   }
 }
 

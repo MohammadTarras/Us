@@ -15,12 +15,6 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import traceback
 from functools import wraps
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from io import BytesIO
 import calendar
 import json
@@ -500,140 +494,220 @@ def send_event_email_now(event):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def export_memories_to_pdf(events, export_type="selected"):
-    """Export memories to a beautifully formatted PDF with Arabic support."""
+    """Export memories to a beautifully formatted PDF using fpdf2."""
     try:
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
-        
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter,
-                              topMargin=0.5*inch, bottomMargin=0.5*inch,
-                              leftMargin=0.75*inch, rightMargin=0.75*inch)
-        
-        # Register a font that supports Arabic (DejaVu Sans supports Unicode)
-        # If DejaVuSans is not available, it will fallback to Helvetica
+        from fpdf import FPDF
+        import os
+        import tempfile
+
+        # Page dimensions in mm (Letter size)
+        PAGE_W = 215.9
+        MARGIN = 20
+        CONTENT_W = PAGE_W - 2 * MARGIN
+
+        pdf = FPDF(format='letter')
+        pdf.set_auto_page_break(auto=True, margin=20)
+
+        # ── Register fonts ──────────────────────────────────────────────
+        font_registered = False
+        font_candidates = [
+            ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf',
+             'C:/Windows/Fonts/ariali.ttf'),
+            ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+             '/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf'),
+        ]
+        for regular, bold, italic in font_candidates:
+            if os.path.exists(regular):
+                pdf.add_font('Body', '', regular)
+                if os.path.exists(bold):
+                    pdf.add_font('Body', 'B', bold)
+                if os.path.exists(italic):
+                    pdf.add_font('Body', 'I', italic)
+                font_registered = True
+                break
+
+        emoji_font_candidates = [
+            'C:/Windows/Fonts/seguiemj.ttf',
+            '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf',
+        ]
+        emoji_font_name = None
+        for ef in emoji_font_candidates:
+            if os.path.exists(ef):
+                pdf.add_font('Emoji', '', ef)
+                emoji_font_name = 'Emoji'
+                break
+
+        body_font = 'Body' if font_registered else 'Helvetica'
+
+        # Set emoji font as fallback so multi_cell auto-switches for emoji
+        if emoji_font_name:
+            pdf.set_fallback_fonts([emoji_font_name])
+
+        # Enable text shaping (uharfbuzz) for native Arabic RTL + ligatures.
+        # Test that uharfbuzz actually works before enabling —
+        # set_text_shaping(True) can succeed but HarfBuzzFont may fail later.
+        text_shaping_ok = False
         try:
-            pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
-            pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
-            body_font = 'DejaVuSans'
-            body_font_bold = 'DejaVuSans-Bold'
-        except:
-            body_font = 'Helvetica'
-            body_font_bold = 'Helvetica-Bold'
-        
-        story = []
-        styles = getSampleStyleSheet()
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=28,
-            textColor=colors.HexColor('#3a2e2e'),
-            spaceAfter=6,
-            alignment=TA_CENTER,
-            fontName=body_font_bold
-        )
-        
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#c9866b'),
-            spaceAfter=8,
-            spaceBefore=12,
-            fontName=body_font_bold
-        )
-        
-        event_date_style = ParagraphStyle(
-            'EventDate',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#b08070'),
-            spaceAfter=4,
-            fontName=body_font
-        )
-        
-        body_style = ParagraphStyle(
-            'EventBody',
-            parent=styles['Normal'],
-            fontSize=11,
-            textColor=colors.HexColor('#3a2e2e'),
-            leading=16,
-            spaceAfter=12,
-            alignment=TA_JUSTIFY,
-            fontName=body_font
-        )
-        
-        # Title
+            import uharfbuzz as _hb
+            # Verify HarfBuzzFont subclass can be created
+            _test_face = _hb.Face(_hb.Blob(b'\x00' * 12), 0)
+            type('_HBF', (_hb.Font,), {})(_test_face)
+            pdf.set_text_shaping(True)
+            text_shaping_ok = True
+        except Exception:
+            pass
+
+        # Fallback: reshape Arabic manually if uharfbuzz is not available
+        def _reshape_arabic_fallback(text):
+            if text_shaping_ok or not ARABIC_RE.search(text):
+                return text
+            try:
+                import arabic_reshaper
+                from bidi.algorithm import get_display
+                lines = text.split('\n')
+                processed = []
+                for line in lines:
+                    if ARABIC_RE.search(line):
+                        reshaped = arabic_reshaper.reshape(line)
+                        processed.append(get_display(reshaped))
+                    else:
+                        processed.append(line)
+                return '\n'.join(processed)
+            except ImportError:
+                return text
+
+        # ── Helper: write a text block ──────────────────────────────────
+        def write_text(text, font_size=11, bold=False, italic=False,
+                       color=(58, 46, 46), align='', line_height=1.6):
+            style = ''
+            if bold:
+                style += 'B'
+            if italic:
+                style += 'I'
+
+            # Auto-detect RTL for alignment
+            if not align and is_arabic(text):
+                align = 'R'
+
+            # Apply Arabic reshaping fallback if text_shaping unavailable
+            text = _reshape_arabic_fallback(text)
+
+            lh = font_size * line_height * 0.352778
+
+            pdf.set_text_color(*color)
+            pdf.set_font(body_font, style, font_size)
+
+            pdf.multi_cell(
+                w=CONTENT_W, h=lh,
+                text=text, align=align or 'L',
+                new_x='LMARGIN', new_y='NEXT'
+            )
+
+        # ── Cover page ──────────────────────────────────────────────────
+        pdf.add_page()
+        pdf.ln(30)
+
+        # Title — fallback font handles emoji automatically
+        pdf.set_font(body_font, 'B', 28)
+        pdf.set_text_color(58, 46, 46)
+        pdf.cell(w=CONTENT_W, h=12, text='❤️ M & S ❤️', align='C')
+        pdf.ln(14)
+
+        # Subtitle
         today = date.today()
         days = (today - START_DATE).days
-        story.append(Paragraph("❤️ M & S ❤️", title_style))
-        story.append(Spacer(1, 0.1*inch))
-        story.append(Paragraph("Our Beautiful Memories", styles['Normal']))
-        story.append(Paragraph(f"Day {days} Together", styles['Normal']))
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Add memories
+        pdf.set_font(body_font, '', 12)
+        pdf.set_text_color(138, 111, 111)
+        pdf.cell(w=CONTENT_W, h=7, text='Our Beautiful Memories', align='C')
+        pdf.ln(8)
+        pdf.cell(w=CONTENT_W, h=7, text=f'Day {days} Together', align='C')
+        pdf.ln(15)
+
+        # Decorative line
+        pdf.set_draw_color(212, 133, 122)
+        pdf.set_line_width(0.5)
+        center_x = PAGE_W / 2
+        pdf.line(center_x - 30, pdf.get_y(), center_x + 30, pdf.get_y())
+        pdf.ln(10)
+
+        # ── Memory pages ────────────────────────────────────────────────
         for i, event in enumerate(events):
-            if i > 0:
-                story.append(PageBreak())
-            
+            pdf.add_page()
+
             formatted_date = event['date'].strftime('%B %d, %Y')
-            
-            story.append(Paragraph(event['title'], heading_style))
-            story.append(Paragraph(f"📅 {formatted_date}", event_date_style))
-            story.append(Spacer(1, 0.15*inch))
-            
-            # Add image if exists with proper aspect ratio
+
+            # Event title
+            write_text(event['title'], font_size=16, bold=True,
+                       color=(201, 134, 107))
+
+            # Date — centered below title
+            pdf.ln(2)
+            pdf.set_font(body_font, '', 10)
+            pdf.set_text_color(176, 128, 112)
+            pdf.cell(w=CONTENT_W, h=5, text=f'📅 {formatted_date}', align='C')
+            pdf.ln(8)
+
+            # Image
             if event.get('image') and event['image'].startswith('data:image'):
                 try:
                     img_data = base64.b64decode(event['image'].split(',')[1])
-                    img_buffer = BytesIO(img_data)
-                    
-                    # Open image to get actual dimensions
-                    pil_img = Image.open(img_buffer)
-                    img_width, img_height = pil_img.size
-                    aspect_ratio = img_width / img_height
-                    
-                    # Calculate dimensions maintaining aspect ratio
-                    max_width = 5 * inch
-                    max_height = 4 * inch
-                    
-                    if aspect_ratio > (max_width / max_height):
-                        # Width is the limiting factor
-                        pdf_width = max_width
-                        pdf_height = max_width / aspect_ratio
+                    pil_img = Image.open(BytesIO(img_data))
+                    img_w, img_h = pil_img.size
+                    aspect = img_w / img_h
+
+                    max_w_mm = CONTENT_W
+                    max_h_mm = 100
+                    if aspect > (max_w_mm / max_h_mm):
+                        display_w = max_w_mm
+                        display_h = max_w_mm / aspect
                     else:
-                        # Height is the limiting factor
-                        pdf_height = max_height
-                        pdf_width = max_height * aspect_ratio
-                    
-                    # Reset buffer position
-                    img_buffer.seek(0)
-                    rl_image = RLImage(img_buffer, width=pdf_width, height=pdf_height)
-                    story.append(rl_image)
-                    story.append(Spacer(1, 0.15*inch))
-                except Exception as e:
-                    # Silently skip image if there's an error
+                        display_h = max_h_mm
+                        display_w = max_h_mm * aspect
+
+                    # Save to temp file for fpdf2
+                    tmp = tempfile.NamedTemporaryFile(
+                        suffix='.png', delete=False)
+                    pil_img.save(tmp, format='PNG')
+                    tmp.close()
+
+                    x = MARGIN + (CONTENT_W - display_w) / 2
+                    pdf.image(tmp.name, x=x, w=display_w, h=display_h)
+                    pdf.ln(5)
+
+                    os.remove(tmp.name)
+                except Exception:
                     pass
-            
+
             # Preview
             if event.get('preview'):
-                preview_text = event['preview'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                story.append(Paragraph(f"<i>{preview_text}</i>", body_style))
-                story.append(Spacer(1, 0.1*inch))
-            
-            # Description with Arabic support
+                pdf.ln(3)
+                write_text(event['preview'], font_size=11, italic=True,
+                           color=(138, 111, 111))
+                pdf.ln(3)
+
+            # Decorative separator
+            pdf.set_draw_color(232, 180, 173)
+            pdf.set_line_width(0.3)
+            pdf.line(MARGIN + 20, pdf.get_y(),
+                     PAGE_W - MARGIN - 20, pdf.get_y())
+            pdf.ln(5)
+
+            # Description
             if event.get('description'):
-                # Escape HTML special characters to prevent PDF generation errors
-                desc = event['description'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br/>')
-                story.append(Paragraph(desc, body_style))
-        
-        # Build PDF
-        doc.build(story)
+                for line in event['description'].split('\n'):
+                    if line.strip():
+                        write_text(line, font_size=11, color=(58, 46, 46))
+                    else:
+                        pdf.ln(3)
+
+        # Output to buffer
+        buffer = BytesIO()
+        pdf_bytes = pdf.output()
+        buffer.write(pdf_bytes)
         buffer.seek(0)
         return buffer
+
     except Exception as e:
         st.error(f"PDF export error: {e}")
         import traceback
@@ -736,34 +810,11 @@ def inject_js():
     });
   }
 
-  function initCalendarClicks() {
-    document.addEventListener('click', (e) => {
-      const cell = e.target.closest('[data-cal-event-id]');
-      if (!cell) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const eventId = cell.getAttribute('data-cal-event-id');
-      if (!eventId) return;
-
-      // Preserve session_token so auth survives the navigation,
-      // then add cal_event which Streamlit reads on next render.
-      const params = new URLSearchParams(window.location.search);
-      params.set('cal_event', eventId);
-      window.location.search = params.toString();
-      console.log('', `Calendar click: event ID ${eventId}`);
-    }, { passive: true });
-    });
-  }
-
   function init() {
     createPetals();
     initScrollReveal();
-    initCalendarClicks();
     const mo = new MutationObserver(() => {
       initScrollReveal();
-      initCalendarClicks();
     });
     const target = document.querySelector('.main') || document.body;
     mo.observe(target, { childList: true, subtree: true });
@@ -798,9 +849,7 @@ button[kind="header"] {
     visibility: hidden !important;
 }
 
-[data-testid="stSidebar"] {
-    display: none !important;
-}
+/* Sidebar is visible — styled below */
 
 .stApp {
     margin-top: 0 !important;
@@ -894,10 +943,35 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 
 /* ─── SIDEBAR ───────────────────────────────────────── */
 [data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #fff5f0 0%, var(--sidebar) 100%);
-  border-right: 1px solid var(--border);
+  background: linear-gradient(180deg, #fff5f0 0%, var(--sidebar) 100%) !important;
+  border-right: 1px solid var(--border) !important;
+}
+[data-testid="stSidebar"] > div:first-child {
+  padding-top: 1rem !important;
 }
 [data-testid="stSidebar"] * { color: var(--text) !important; }
+
+/* Sidebar collapse/expand toggle button styling */
+[data-testid="collapsedControl"] {
+  color: var(--rose) !important;
+}
+[data-testid="collapsedControl"] svg {
+  stroke: var(--rose) !important;
+}
+
+/* Mobile sidebar */
+@media (max-width: 768px) {
+  [data-testid="stSidebar"] {
+    z-index: 999 !important;
+  }
+  [data-testid="collapsedControl"] {
+    display: block !important;
+  }
+  .main .block-container {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+}
 
 .sidebar-logo {
   text-align:center;
@@ -1296,40 +1370,39 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   background: #fef3ec;
 }
 
+.cal-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  background: #fff;
+  color: var(--rose-deep);
+  font-size: 0.6rem;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
 /* ───── CALENDAR CLICKABLE INTERACTION ───── */
 .calendar-day-clickable {
   cursor: pointer !important;
   position: relative;
-  transition: transform .2s cubic-bezier(.34,1.56,.64,1), 
+  transition: transform .2s cubic-bezier(.34,1.56,.64,1),
               box-shadow .2s ease !important;
 }
 
 .calendar-day-clickable:hover {
   transform: scale(1.08) !important;
+  box-shadow: 0 6px 16px rgba(212,133,122,0.5) !important;
 }
 
 .calendar-day-clickable:active {
-  transform: scale(0.98) !important;
-}
-
-/* Hide Streamlit buttons used for calendar interaction */
-.calendar-hidden-buttons {
-  position: absolute;
-  left: -9999px;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  visibility: hidden;
-  display: none !important;
-}
-
-.calendar-hidden-buttons button {
-  width: 0 !important;
-  height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-  display: none !important;
+  transform: scale(0.96) !important;
 }
 
 /* ─── SEARCH & FILTER BOX ───────────────────────────────── */
@@ -1627,8 +1700,8 @@ def init_session():
         'filter_date_from': None,
         'filter_date_to': None,
         'show_filters': False,
-        'calendar_year': None,
         'calendar_month': None,
+        'cal_picker_day': None,  # day number when multi-event popup is open
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1643,6 +1716,14 @@ def login_page():
     days = (today - START_DATE).days
 
     inject_css()
+
+    # Hide sidebar on login page
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
@@ -1679,109 +1760,6 @@ def login_page():
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-
-def display_mobile_sidebar():
-    """Display collapsible mobile sidebar menu."""
-    today = date.today()
-    days = (today - START_DATE).days
-    username = st.session_state.user.get('username', '').lower()
-    display_name = COUPLE_NAMES.get(username, username.title())
-    
-    # Initialize mobile menu state
-    if 'mobile_menu_open' not in st.session_state:
-        st.session_state.mobile_menu_open = False
-    
-    # Toggle button at top
-    col1, col2 = st.columns([0.15, 1])
-    with col1:
-        if st.button("☰", key="toggle_mobile_menu_btn", help="Open menu"):
-            st.session_state.mobile_menu_open = not st.session_state.mobile_menu_open
-            st.rerun()
-    
-    # Show sidebar if open
-    if st.session_state.mobile_menu_open:
-        # Use a container for the menu
-        with st.container():
-            # Logo section
-            col_logo = st.columns([1])[0]
-            with col_logo:
-                st.markdown("""
-                <div style="text-align:center; padding: 1rem 0; margin-bottom: 1rem;">
-                    <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">❤️</div>
-                    <h2 style="font-family:'Playfair Display',serif; color: var(--rose); margin: 0; font-size: 1.4rem;">M & S</h2>
-                    <p style="font-size: 0.75rem; color: var(--muted); margin: 0.3rem 0 0;">Mohammad & Shahed</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Days counter
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #d4857a 0%, #c9866b 100%); border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem; color: white;">
-                <div style="font-family:'Playfair Display',serif; font-size: 2rem; font-weight: 700; line-height: 1;">{days}</div>
-                <div style="font-size: 0.7rem; letter-spacing: 0.5px; margin-top: 0.3rem;">days of us 🌸</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Welcome pill
-            st.markdown(f"""
-            <div style="background: rgba(255,255,255,0.8); border: 1px solid var(--border); border-radius: 20px; padding: 0.6rem 1rem; text-align: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
-                Welcome, <strong style="color: var(--rose);">{display_name}</strong> ✨
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.divider()
-        
-        # Add Memory Button
-        if st.button("➕ Add Memory", use_container_width=True, type="primary", key="mobile_add_mem"):
-            st.session_state.show_add_form = True
-            st.session_state.selected_event = None
-            st.session_state.edit_event_id = None
-            st.session_state.mobile_menu_open = False
-            st.rerun()
-        
-        st.markdown("**📋 View Mode**")
-        view_col1, view_col2 = st.columns(2)
-        with view_col1:
-            if st.button("📅 Timeline", 
-                        type="primary" if st.session_state.view_mode == 'timeline' else "secondary",
-                        use_container_width=True, key="mobile_timeline"):
-                st.session_state.view_mode = 'timeline'
-                st.session_state.mobile_menu_open = False
-                st.rerun()
-        with view_col2:
-            if st.button("🖼️ Gallery", 
-                        type="primary" if st.session_state.view_mode == 'gallery' else "secondary",
-                        use_container_width=True, key="mobile_gallery"):
-                st.session_state.view_mode = 'gallery'
-                st.session_state.mobile_menu_open = False
-                st.rerun()
-        
-        st.markdown("**📬 Today's Memories**")
-        col_send, col_resend = st.columns(2)
-        with col_send:
-            if st.button("Send", use_container_width=True, type="primary", key="mobile_send"):
-                with st.spinner("Sending..."):
-                    n = send_today_reminders(force=False)
-                    if n:
-                        st.success(f"✉️ {n} memory/memories sent!")
-                    else:
-                        st.info("Already sent today — use Resend to send again.")
-                st.session_state.mobile_menu_open = False
-                st.rerun()
-        with col_resend:
-            if st.button("Resend", use_container_width=True, key="mobile_resend"):
-                with st.spinner("Resending..."):
-                    n = send_today_reminders(force=True)
-                    if n:
-                        st.success(f"✉️ Resent {n} memory/memories!")
-                    else:
-                        st.info("No memories found for today's date.")
-                st.session_state.mobile_menu_open = False
-                st.rerun()
-        
-        st.divider()
-        
-        if st.button("🚪 Sign out", use_container_width=True, key="mobile_logout"):
-            logout()
 
 
 def display_sidebar():
@@ -2002,100 +1980,229 @@ def display_gallery_view(events):
                     pass
 
 
+@st.dialog("Choose a Memory")
+def _show_event_picker_dialog(day_num, evs, month_num):
+    """Popup dialog to pick from multiple events on the same day."""
+    month_name_short = calendar.month_abbr[month_num]
+    st.markdown(
+        f"<p style='color:var(--muted);font-size:0.9rem;margin-bottom:0.5rem;'>"
+        f"You have <strong>{len(evs)}</strong> memories on "
+        f"<strong>{month_name_short} {day_num}</strong></p>",
+        unsafe_allow_html=True
+    )
+    for ev in evs:
+        yr = ev['date'].strftime('%Y')
+        col_img, col_btn = st.columns([0.12, 1])
+        with col_img:
+            if ev.get('image'):
+                st.markdown(
+                    f"<img src='{ev['image']}' style='width:42px;height:42px;"
+                    f"border-radius:8px;object-fit:cover;margin-top:4px;'>",
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    "<div style='width:42px;height:42px;border-radius:8px;"
+                    "background:linear-gradient(135deg,#d4857a,#c9866b);"
+                    "display:flex;align-items:center;justify-content:center;"
+                    "color:#fff;font-size:1.2rem;margin-top:4px;'>🌸</div>",
+                    unsafe_allow_html=True
+                )
+        with col_btn:
+            if st.button(
+                f"{ev['title']}  ·  {yr}",
+                key=f"cal_pick_{ev['id']}",
+                use_container_width=True,
+            ):
+                st.session_state.selected_event_id = ev['id']
+                st.session_state.selected_event = None
+                st.session_state.edit_event_id = None
+                st.session_state.cal_picker_day = None
+                st.rerun()
+
+
 def display_calendar_view(events):
-    """Display calendar with highlighted dates that have events."""
+    """Birthday-style calendar: matches events by month+day across all years."""
     if not events:
         st.info("No memories to display.")
         return
 
-    # Initialize calendar month/year if not set
-    if st.session_state.calendar_year is None:
-        st.session_state.calendar_year = date.today().year
+    # Initialize calendar month if not set (no year needed — birthday style)
     if st.session_state.calendar_month is None:
         st.session_state.calendar_month = date.today().month
 
-    # Month/Year navigation
+    # Month navigation (no year — cycles through 12 months)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
-        if st.button("← Prev Month", key="cal_prev"):
+        if st.button("← Prev", key="cal_prev"):
             st.session_state.calendar_month -= 1
             if st.session_state.calendar_month < 1:
                 st.session_state.calendar_month = 12
-                st.session_state.calendar_year -= 1
+            st.session_state.cal_picker_day = None
             st.rerun()
     with col2:
         month_name = calendar.month_name[st.session_state.calendar_month]
-        st.markdown(f"<div style='text-align:center;font-size:1.1rem;color:var(--text);'><strong>{month_name} {st.session_state.calendar_year}</strong></div>", unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='text-align:center;font-size:1.1rem;color:var(--text);'>"
+            f"<strong>{month_name}</strong></div>",
+            unsafe_allow_html=True
+        )
     with col3:
-        if st.button("Next Month →", key="cal_next"):
+        if st.button("Next →", key="cal_next"):
             st.session_state.calendar_month += 1
             if st.session_state.calendar_month > 12:
                 st.session_state.calendar_month = 1
-                st.session_state.calendar_year += 1
+            st.session_state.cal_picker_day = None
             st.rerun()
 
-    # Build a day -> event map for the current month
-    event_dates = {}
-    ordered_event_days = []
+    # Build day -> list of events for the current month (across ALL years)
+    day_events = {}  # day_num -> [ev, ev, ...]
     for ev in events:
-        if ev['date'].year == st.session_state.calendar_year and ev['date'].month == st.session_state.calendar_month:
+        if ev['date'].month == st.session_state.calendar_month:
             day = ev['date'].day
-            if day not in event_dates:
-                event_dates[day] = ev
-                ordered_event_days.append((day, ev))
+            if day not in day_events:
+                day_events[day] = []
+            day_events[day].append(ev)
 
-    # Get the calendar matrix
-    cal = calendar.monthcalendar(st.session_state.calendar_year, st.session_state.calendar_month)
+    # Sort each day's events by date descending (latest first)
+    for day in day_events:
+        day_events[day].sort(key=lambda e: e['date'], reverse=True)
 
-    # Build HTML calendar grid with clickable cells
+    # Use current year for the calendar grid layout
+    display_year = date.today().year
+    cal = calendar.monthcalendar(display_year, st.session_state.calendar_month)
+
+    # Build HTML calendar grid
+    today = date.today()
     calendar_html = '<div class="calendar-grid">'
 
     for day_name in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']:
         calendar_html += f'<div class="calendar-day-header">{day_name}</div>'
 
-    today = date.today()
     for week in cal:
         for day in week:
             if day == 0:
                 calendar_html += '<div class="calendar-day empty"></div>'
-            elif day in event_dates:
-                ev = event_dates[day]
-                safe_title = ev['title'].replace('"', '&quot;')
+            elif day in day_events:
+                evs = day_events[day]
+                latest = evs[0]  # latest event (for display)
+                safe_title = latest['title'].replace('"', '&quot;')
                 is_today = (day == today.day
-                            and st.session_state.calendar_month == today.month
-                            and st.session_state.calendar_year == today.year)
+                            and st.session_state.calendar_month == today.month)
                 today_cls = ' is-today' if is_today else ''
-                if ev.get('image'):
+                count = len(evs)
+                badge = f'<span class="cal-badge">{count}</span>' if count > 1 else ''
+                if latest.get('image'):
+                    img = latest['image']
                     calendar_html += (
                         f'<div class="calendar-day has-event has-event-img calendar-day-clickable{today_cls}" '
-                        f'data-cal-event-id="{ev["id"]}" '
-                        f'style="background-image:url(\'{ev["image"]}\');" '
+                        f'data-cal-day="{day}" '
+                        f'style="background-image:url(\'{img}\');" '
                         f'title="{safe_title}">'
                         f'<div class="cal-img-overlay"></div>'
                         f'<span class="cal-day-num">{day}</span>'
+                        f'{badge}'
                         f'</div>'
                     )
                 else:
                     calendar_html += (
                         f'<div class="calendar-day has-event calendar-day-clickable{today_cls}" '
-                        f'data-cal-event-id="{ev["id"]}" '
+                        f'data-cal-day="{day}" '
                         f'title="{safe_title}">'
                         f'<span class="cal-day-num">{day}</span>'
+                        f'{badge}'
                         f'</div>'
                     )
             else:
                 is_today = (day == today.day
-                            and st.session_state.calendar_month == today.month
-                            and st.session_state.calendar_year == today.year)
+                            and st.session_state.calendar_month == today.month)
                 today_cls = ' is-today' if is_today else ''
                 calendar_html += f'<div class="calendar-day{today_cls}">{day}</div>'
 
     calendar_html += '</div>'
     st.markdown(calendar_html, unsafe_allow_html=True)
 
-    # Display info
-    if ordered_event_days:
-        st.markdown("<div style='margin-top:1rem;'><strong>📅 Click any highlighted date to open that memory</strong></div>", unsafe_allow_html=True)
+    # Hidden buttons: one per day that has events.
+    # Single-event days go straight to that event.
+    # Multi-event days open a picker popup.
+    has_buttons = False
+    cal_btn_container = st.container()
+    with cal_btn_container:
+        for day_num in sorted(day_events.keys()):
+            has_buttons = True
+            evs = day_events[day_num]
+            if len(evs) == 1:
+                # Single event — direct open
+                if st.button(f"_cal_day_{day_num}", key=f"cal_hd_{day_num}"):
+                    st.session_state.selected_event_id = evs[0]['id']
+                    st.session_state.selected_event = None
+                    st.session_state.edit_event_id = None
+                    st.session_state.cal_picker_day = None
+                    st.rerun()
+            else:
+                # Multiple events — open picker
+                if st.button(f"_cal_day_{day_num}", key=f"cal_hd_{day_num}"):
+                    st.session_state.cal_picker_day = day_num
+                    st.rerun()
+
+    if has_buttons:
+        import streamlit.components.v1 as components
+        components.html("""
+        <script>
+        (function() {
+          var doc = window.parent.document;
+
+          function hideCalButtons() {
+            doc.querySelectorAll('button').forEach(function(btn) {
+              if (btn.textContent.trim().indexOf('_cal_day_') === 0) {
+                btn.style.position = 'absolute';
+                btn.style.left = '-9999px';
+                btn.style.height = '0';
+                btn.style.overflow = 'hidden';
+                btn.style.opacity = '0';
+                btn.style.pointerEvents = 'none';
+              }
+            });
+          }
+
+          function wireClicks() {
+            doc.querySelectorAll('[data-cal-day]').forEach(function(cell) {
+              if (cell._calWired) return;
+              cell._calWired = true;
+              cell.style.cursor = 'pointer';
+              cell.addEventListener('click', function() {
+                var dayNum = cell.getAttribute('data-cal-day');
+                var buttons = doc.querySelectorAll('button');
+                for (var i = 0; i < buttons.length; i++) {
+                  if (buttons[i].textContent.trim() === '_cal_day_' + dayNum) {
+                    buttons[i].click();
+                    return;
+                  }
+                }
+              });
+            });
+          }
+
+          function init() {
+            hideCalButtons();
+            wireClicks();
+          }
+
+          init();
+          new MutationObserver(init).observe(doc.body, {childList:true, subtree:true});
+        })();
+        </script>
+        """, height=0)
+
+    # Show multi-event picker dialog if a multi-event day was clicked
+    if st.session_state.cal_picker_day is not None:
+        picker_day = st.session_state.cal_picker_day
+        if picker_day in day_events:
+            _show_event_picker_dialog(
+                picker_day,
+                day_events[picker_day],
+                st.session_state.calendar_month,
+            )
 
 
 def display_event_detail(event):
@@ -2158,7 +2265,7 @@ def add_event_form():
 
     with st.form("add_event_form"):
         title = st.text_input("Memory Title *", placeholder="Give this memory a name...")
-        preview = st.text_area("Preview (2-3 lines) *", placeholder="A short teaser of this memory...", height=60)
+        preview = st.text_area("Preview (2-3 lines) *", placeholder="A short teaser of this memory...", height=68)
         event_date = st.date_input("Date *", value=date.today())
         description = st.text_area("Full Story *", placeholder="Tell us everything... what happened, how you felt, why it matters...", height=180)
 
@@ -2261,9 +2368,6 @@ def edit_event_form(event):
 def show_events_page():
     EVENTS_PER_PAGE = 8
     
-    # Display mobile sidebar menu on mobile devices
-    display_mobile_sidebar()
-
     st.markdown("""
     <div class="page-hero">
         <h1>Our <em>Memories</em></h1>
@@ -2407,6 +2511,14 @@ def show_events_page():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def welcome_animation():
+    # Hide sidebar during welcome animation
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     today = date.today()
     days = (today - START_DATE).days
     username = st.session_state.user.get('username', '').lower()
@@ -2478,7 +2590,7 @@ def main():
         except Exception:
             pass
 
-    # Show desktop sidebar only (mobile sidebar is in show_events_page)
+    # Show left sidebar (works on both desktop and mobile)
     display_sidebar()
     show_events_page()
 

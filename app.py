@@ -837,14 +837,24 @@ def inject_css():
 /* ───────────────── STREAMLIT CLEANUP ───────────────── */
 
 #MainMenu,
-header,
 footer,
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
-[data-testid="stHeader"],
-[data-testid="stSidebarNav"],
-button[kind="header"] {
+[data-testid="stSidebarNav"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Keep Streamlit header mounted so the mobile sidebar toggle still works. */
+header,
+[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 0 !important;
+    min-height: 0 !important;
+}
+
+button[kind="header"]:not([data-testid="collapsedControl"]) {
     display: none !important;
     visibility: hidden !important;
 }
@@ -954,6 +964,12 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 /* Sidebar collapse/expand toggle button styling */
 [data-testid="collapsedControl"] {
   color: var(--rose) !important;
+  display: flex !important;
+  visibility: visible !important;
+  position: fixed !important;
+  top: 0.75rem !important;
+  left: 0.75rem !important;
+  z-index: 1001 !important;
 }
 [data-testid="collapsedControl"] svg {
   stroke: var(--rose) !important;

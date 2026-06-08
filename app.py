@@ -747,6 +747,29 @@ def inject_js():
     st.markdown("""
 <script>
 (function() {
+  function rescueSidebarToggle() {
+    const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+    candidates.forEach((el) => {
+      const label = [
+        el.getAttribute('data-testid') || '',
+        el.getAttribute('aria-label') || '',
+        el.getAttribute('title') || '',
+        el.innerText || ''
+      ].join(' ').toLowerCase();
+
+      if (!/(sidebar|navigation|nav|menu)/.test(label)) return;
+
+      el.style.setProperty('display', 'flex', 'important');
+      el.style.setProperty('visibility', 'visible', 'important');
+      el.style.setProperty('opacity', '1', 'important');
+      el.style.setProperty('position', 'fixed', 'important');
+      el.style.setProperty('top', '0.75rem', 'important');
+      el.style.setProperty('left', '0.75rem', 'important');
+      el.style.setProperty('z-index', '1001', 'important');
+      el.style.setProperty('pointer-events', 'auto', 'important');
+    });
+  }
+
   function createPetals() {
     if (document.getElementById('petal-canvas')) return;
     const canvas = document.createElement('canvas');
@@ -813,8 +836,10 @@ def inject_js():
   function init() {
     createPetals();
     initScrollReveal();
+    rescueSidebarToggle();
     const mo = new MutationObserver(() => {
       initScrollReveal();
+      rescueSidebarToggle();
     });
     const target = document.querySelector('.main') || document.body;
     mo.observe(target, { childList: true, subtree: true });
@@ -850,11 +875,10 @@ footer,
 header,
 [data-testid="stHeader"] {
     background: transparent !important;
-    height: 0 !important;
-    min-height: 0 !important;
+    box-shadow: none !important;
 }
 
-button[kind="header"]:not([data-testid="collapsedControl"]) {
+button[kind="header"]:not([data-testid="collapsedControl"]):not([aria-label*="sidebar" i]):not([title*="sidebar" i]):not([aria-label*="navigation" i]):not([title*="navigation" i]):not([aria-label*="menu" i]):not([title*="menu" i]) {
     display: none !important;
     visibility: hidden !important;
 }
@@ -962,7 +986,13 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
 [data-testid="stSidebar"] * { color: var(--text) !important; }
 
 /* Sidebar collapse/expand toggle button styling */
-[data-testid="collapsedControl"] {
+[data-testid="collapsedControl"],
+button[kind="header"][aria-label*="sidebar" i],
+button[kind="header"][title*="sidebar" i],
+button[kind="header"][aria-label*="navigation" i],
+button[kind="header"][title*="navigation" i],
+button[kind="header"][aria-label*="menu" i],
+button[kind="header"][title*="menu" i] {
   color: var(--rose) !important;
   display: flex !important;
   visibility: visible !important;
@@ -971,7 +1001,13 @@ html, body, [class*="css"] { font-family: 'Lato', 'Cairo', sans-serif; }
   left: 0.75rem !important;
   z-index: 1001 !important;
 }
-[data-testid="collapsedControl"] svg {
+[data-testid="collapsedControl"] svg,
+button[kind="header"][aria-label*="sidebar" i] svg,
+button[kind="header"][title*="sidebar" i] svg,
+button[kind="header"][aria-label*="navigation" i] svg,
+button[kind="header"][title*="navigation" i] svg,
+button[kind="header"][aria-label*="menu" i] svg,
+button[kind="header"][title*="menu" i] svg {
   stroke: var(--rose) !important;
 }
 

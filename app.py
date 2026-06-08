@@ -510,6 +510,7 @@ def export_memories_to_pdf(events, export_type="selected"):
 
         # ── Register fonts ──────────────────────────────────────────────
         font_registered = False
+        registered_styles = set()
         font_candidates = [
             ('C:/Windows/Fonts/arial.ttf', 'C:/Windows/Fonts/arialbd.ttf',
              'C:/Windows/Fonts/ariali.ttf'),
@@ -526,10 +527,13 @@ def export_memories_to_pdf(events, export_type="selected"):
         for regular, bold, italic in font_candidates:
             if os.path.exists(regular):
                 pdf.add_font('Body', '', regular)
+                registered_styles.add('')
                 if os.path.exists(bold):
                     pdf.add_font('Body', 'B', bold)
+                    registered_styles.add('B')
                 if os.path.exists(italic):
                     pdf.add_font('Body', 'I', italic)
+                    registered_styles.add('I')
                 font_registered = True
                 break
 
@@ -604,6 +608,14 @@ def export_memories_to_pdf(events, export_type="selected"):
                 style += 'B'
             if italic:
                 style += 'I'
+            # Fall back to available styles if requested style not registered
+            if font_registered and style not in registered_styles:
+                if 'B' in style and 'B' in registered_styles:
+                    style = 'B'
+                elif 'I' in style and 'I' in registered_styles:
+                    style = 'I'
+                else:
+                    style = ''
 
             # Auto-detect RTL for alignment
             if not align and is_arabic(text):

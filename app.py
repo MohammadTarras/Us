@@ -516,6 +516,12 @@ def export_memories_to_pdf(events, export_type="selected"):
             ('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
              '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
              '/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf'),
+            ('/usr/share/fonts/truetype/freefont/FreeSans.ttf',
+             '/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',
+             '/usr/share/fonts/truetype/freefont/FreeSansOblique.ttf'),
+            ('/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+             '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
+             '/usr/share/fonts/truetype/liberation/LiberationSans-Italic.ttf'),
         ]
         for regular, bold, italic in font_candidates:
             if os.path.exists(regular):
@@ -543,6 +549,19 @@ def export_memories_to_pdf(events, export_type="selected"):
         # Set emoji font as fallback so multi_cell auto-switches for emoji
         if emoji_font_name:
             pdf.set_fallback_fonts([emoji_font_name])
+
+        # Strip emojis from text when no emoji font is available
+        def _safe_text(text):
+            if emoji_font_name or not text:
+                return text
+            import re
+            # Remove emoji and other non-BMP characters that Helvetica can't render
+            return re.sub(
+                r'[\U0001F000-\U0001FFFF\u2600-\u27BF\u2700-\u27BF'
+                r'\uFE00-\uFE0F\u200D\u2764\u2665\u2763'
+                r'\U0001F300-\U0001F9FF\U0001FA00-\U0001FA6F]+',
+                '', text
+            ).strip()
 
         # Enable text shaping (uharfbuzz) for native Arabic RTL + ligatures.
         # Test that uharfbuzz actually works before enabling —
@@ -590,6 +609,8 @@ def export_memories_to_pdf(events, export_type="selected"):
             if not align and is_arabic(text):
                 align = 'R'
 
+            # Strip unsupported emojis if no emoji font available
+            text = _safe_text(text)
             # Apply Arabic reshaping fallback if text_shaping unavailable
             text = _reshape_arabic_fallback(text)
 
@@ -611,7 +632,7 @@ def export_memories_to_pdf(events, export_type="selected"):
         # Title — fallback font handles emoji automatically
         pdf.set_font(body_font, 'B', 28)
         pdf.set_text_color(58, 46, 46)
-        pdf.cell(w=CONTENT_W, h=12, text='❤️ M & S ❤️', align='C')
+        pdf.cell(w=CONTENT_W, h=12, text=_safe_text('❤️ M & S ❤️'), align='C')
         pdf.ln(14)
 
         # Subtitle
@@ -645,7 +666,7 @@ def export_memories_to_pdf(events, export_type="selected"):
             pdf.ln(2)
             pdf.set_font(body_font, '', 10)
             pdf.set_text_color(176, 128, 112)
-            pdf.cell(w=CONTENT_W, h=5, text=f'📅 {formatted_date}', align='C')
+            pdf.cell(w=CONTENT_W, h=5, text=_safe_text(f'📅 {formatted_date}'), align='C')
             pdf.ln(8)
 
             # Image

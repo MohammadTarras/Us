@@ -1,1 +1,4 @@
 fonts-dejavu-core
+fonts-noto-color-emoji
+fonts-symbola
+fonts-noto-mono

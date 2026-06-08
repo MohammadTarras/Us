@@ -539,14 +539,47 @@ def export_memories_to_pdf(events, export_type="selected"):
 
         emoji_font_candidates = [
             'C:/Windows/Fonts/seguiemj.ttf',
+            # Symbola — monochrome outline font, works reliably with fpdf2
+            '/usr/share/fonts/truetype/ancient-scripts/Symbola_hint.ttf',
+            '/usr/share/fonts/truetype/symbola/Symbola.ttf',
+            '/usr/share/fonts/truetype/Symbola.ttf',
+            # NotoColorEmoji — may not work with fpdf2 (COLR/CBDT format)
             '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf',
+            '/usr/share/fonts/truetype/noto-color-emoji/NotoColorEmoji.ttf',
+            '/usr/share/fonts/noto-color-emoji/NotoColorEmoji.ttf',
         ]
         emoji_font_name = None
         for ef in emoji_font_candidates:
             if os.path.exists(ef):
-                pdf.add_font('Emoji', '', ef)
-                emoji_font_name = 'Emoji'
-                break
+                try:
+                    pdf.add_font('Emoji', '', ef)
+                    emoji_font_name = 'Emoji'
+                    break
+                except Exception:
+                    continue
+
+        # Last resort: search system for any usable emoji/symbol font
+        if not emoji_font_name:
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ['fc-list', ':style=Regular', 'file'],
+                    capture_output=True, text=True, timeout=5
+                )
+                for line in result.stdout.splitlines():
+                    path = line.strip().rstrip(':')
+                    if path.endswith('.ttf') and any(
+                        k in path.lower()
+                        for k in ['symbola', 'emoji', 'noto']
+                    ):
+                        try:
+                            pdf.add_font('Emoji', '', path)
+                            emoji_font_name = 'Emoji'
+                            break
+                        except Exception:
+                            continue
+            except Exception:
+                pass
 
         body_font = 'Body' if font_registered else 'Helvetica'
 
@@ -554,18 +587,28 @@ def export_memories_to_pdf(events, export_type="selected"):
         if emoji_font_name:
             pdf.set_fallback_fonts([emoji_font_name])
 
-        # Strip emojis from text when no emoji font is available
+        # Replace emojis with text equivalents when no emoji font is available
         def _safe_text(text):
             if emoji_font_name or not text:
                 return text
             import re
-            # Remove emoji and other non-BMP characters that Helvetica can't render
-            return re.sub(
+            # Common emoji replacements
+            replacements = {
+                '❤️': '<3', '❤': '<3', '💕': '<3<3', '💖': '<3',
+                '💗': '<3', '💘': '<3', '💝': '<3', '🥰': '<3',
+                '😍': '<3', '🌸': '*', '🌷': '*', '✨': '*',
+                '📅': '-', '🌹': '@>->--',
+            }
+            for emoji, replacement in replacements.items():
+                text = text.replace(emoji, replacement)
+            # Remove any remaining emoji/non-BMP characters
+            text = re.sub(
                 r'[\U0001F000-\U0001FFFF\u2600-\u27BF\u2700-\u27BF'
                 r'\uFE00-\uFE0F\u200D\u2764\u2665\u2763'
                 r'\U0001F300-\U0001F9FF\U0001FA00-\U0001FA6F]+',
                 '', text
-            ).strip()
+            )
+            return text.strip()
 
         # Enable text shaping (uharfbuzz) for native Arabic RTL + ligatures.
         # Test that uharfbuzz actually works before enabling —

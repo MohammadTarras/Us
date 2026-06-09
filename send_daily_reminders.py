@@ -1,4 +1,5 @@
 import os
+import re
 import smtplib
 import base64
 import traceback
@@ -43,6 +44,11 @@ sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 # LOGGING HELPER
 # ─────────────────────────────────────────────
 
+ARABIC_RE = re.compile(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]')
+
+def is_arabic(text):
+    return bool(ARABIC_RE.search(text))
+
 def log(msg: str):
     """Print timestamped log message."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -74,15 +80,24 @@ def build_event_block(event, index):
 
     year_label = f"<span style='color:#b08070;font-size:13px;'>({event['date'].year})</span>"
 
+    title_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['title']) else 'style="'
+    preview_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['preview']) else 'style="'
+    desc_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['description']) else 'style="'
+
+    card_is_rtl = is_arabic(event['description']) or is_arabic(event['title'])
+    if card_is_rtl:
+        card_border = "border-right:3px solid #e8a598;border-left:none;border-radius:12px 0 0 12px;"
+    else:
+        card_border = "border-left:3px solid #e8a598;border-radius:0 12px 12px 0;"
+
     return f"""
     <div style="
-        border-left: 3px solid #e8a598;
+        {card_border}
         padding: 20px 24px;
         margin-bottom: 32px;
         background: #fffaf8;
-        border-radius: 0 12px 12px 0;
     ">
-        <h2 style="
+        <h2 {title_rtl}
             font-size:22px;
             margin:0 0 4px 0;
             color:#3a2e2e;
@@ -101,7 +116,7 @@ def build_event_block(event, index):
 
         {img_html}
 
-        <div style="
+        <div {preview_rtl}
             font-style:italic;
             color:#7a5c5c;
             line-height:1.8;
@@ -117,7 +132,7 @@ def build_event_block(event, index):
             margin:16px 0;
         "></div>
 
-        <div style="
+        <div {desc_rtl}
             line-height:2;
             font-size:15px;
             color:#3a2e2e;

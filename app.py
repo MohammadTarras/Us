@@ -282,29 +282,38 @@ def _build_event_block(event, index):
         """
     description_html = event['description'].replace("\n", "<br>")
     year_label = f"<span style='color:#b08070;font-size:13px;'>({event['date'].year})</span>"
+    title_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['title']) else 'style="'
+    preview_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['preview']) else 'style="'
+    desc_rtl = 'dir="rtl" style="text-align:right;' if is_arabic(event['description']) else 'style="'
+    # Use border-right instead of border-left for RTL content
+    card_is_rtl = is_arabic(event['description']) or is_arabic(event['title'])
+    if card_is_rtl:
+        card_border = "border-right:3px solid #e8a598;border-left:none;border-radius:12px 0 0 12px;"
+    else:
+        card_border = "border-left:3px solid #e8a598;border-radius:0 12px 12px 0;"
     return f"""
-    <div style="border-left:3px solid #e8a598;padding:20px 24px;margin-bottom:32px;
-                background:#fffaf8;border-radius:0 12px 12px 0;">
-        <h2 style="font-size:22px;margin:0 0 4px 0;color:#3a2e2e;">
+    <div style="{card_border}padding:20px 24px;margin-bottom:32px;
+                background:#fffaf8;">
+        <h2 {title_rtl}font-size:22px;margin:0 0 4px 0;color:#3a2e2e;">
             {event['title']} {year_label}
         </h2>
         <div style="color:#b08070;font-size:13px;letter-spacing:1px;margin-bottom:14px;">
             📅 {event['date'].strftime('%B %d, %Y')}
         </div>
         {img_html}
-        <div style="font-style:italic;color:#7a5c5c;line-height:1.8;
+        <div {preview_rtl}font-style:italic;color:#7a5c5c;line-height:1.8;
                     margin-bottom:16px;font-size:15px;">
             {event['preview']}
         </div>
         <div style="height:1px;background:#f0ddd5;margin:16px 0;"></div>
-        <div style="line-height:2;font-size:15px;color:#3a2e2e;">
+        <div {desc_rtl}line-height:2;font-size:15px;color:#3a2e2e;">
             {description_html}
         </div>
     </div>
     """
 
 
-def _build_digest_html(events, recipient_name):
+def _build_digest_html(events, recipient_name, sender_name=None):
     """Full digest email HTML — one email, all matching memories."""
     today      = date.today()
     days       = (today - START_DATE).days
@@ -312,6 +321,14 @@ def _build_digest_html(events, recipient_name):
     count      = len(events)
     count_label = "One memory" if count == 1 else f"{count} memories"
     blocks = "".join(_build_event_block(e, i) for i, e in enumerate(events))
+
+    if sender_name:
+        subtitle = "A shared memory"
+        intro_text = f"""{sender_name} wanted to remind you about this memory with all love 💕"""
+    else:
+        subtitle = "On this day through the years"
+        intro_text = f"""{count_label} happened on <strong>{date_label}</strong> across the years.
+        Here they all are, just for you:"""
 
     return f"""<!DOCTYPE html>
 <html>
@@ -323,7 +340,7 @@ def _build_digest_html(events, recipient_name):
               text-align:center;color:white;">
     <div style="font-size:28px;">❤️ 🌸 ❤️</div>
     <h1 style="margin:10px 0 0 0;font-size:32px;font-weight:400;">M &amp; S</h1>
-    <div style="opacity:0.9;margin-top:8px;font-style:italic;">On this day through the years</div>
+    <div style="opacity:0.9;margin-top:8px;font-style:italic;">{subtitle}</div>
     <div style="margin-top:14px;font-size:13px;opacity:0.9;">✨ Day {days} together · {date_label} ✨</div>
   </div>
 
@@ -332,8 +349,7 @@ def _build_digest_html(events, recipient_name):
         Good morning, {recipient_name} 🌸
     </div>
     <p style="font-size:15px;color:#7a5c5c;margin:0 0 28px 0;line-height:1.8;">
-        {count_label} happened on <strong>{date_label}</strong> across the years.
-        Here they all are, just for you:
+        {intro_text}
     </p>
     {blocks}
   </div>
@@ -346,7 +362,7 @@ def _build_digest_html(events, recipient_name):
 </html>"""
 
 
-def _send_digest_smtp(events, recipient_email, recipient_name):
+def _send_digest_smtp(events, recipient_email, recipient_name, sender_name=None):
     """Low-level: build and send the digest MIME message."""
     try:
         msg = MIMEMultipart('related')
@@ -354,7 +370,9 @@ def _send_digest_smtp(events, recipient_email, recipient_name):
         date_label = today.strftime('%B %d')
         count      = len(events)
 
-        if count == 1:
+        if sender_name:
+            subject = f"🌸 {sender_name} shared a memory: {events[0]['title']}"
+        elif count == 1:
             subject = f"🌸 On This Day: {events[0]['title']}"
         else:
             subject = f"❤️ On This Day ({date_label}) — {count} memories"
@@ -367,14 +385,17 @@ def _send_digest_smtp(events, recipient_email, recipient_name):
         msg.attach(alt_part)
 
         # Plain text fallback
-        lines = [f"M & S ❤️ — Memories for {date_label}\n"]
+        if sender_name:
+            lines = [f"M & S ❤️ — {sender_name} wanted to remind you about this memory with all love\n"]
+        else:
+            lines = [f"M & S ❤️ — Memories for {date_label}\n"]
         for e in events:
             lines.append(
                 f"\n{'─'*40}\n{e['title']} ({e['date'].year})\n"
                 f"{e['date'].strftime('%B %d, %Y')}\n\n{e['preview']}\n\n{e['description']}\n"
             )
         alt_part.attach(MIMEText("\n".join(lines), 'plain', 'utf-8'))
-        alt_part.attach(MIMEText(_build_digest_html(events, recipient_name), 'html', 'utf-8'))
+        alt_part.attach(MIMEText(_build_digest_html(events, recipient_name, sender_name=sender_name), 'html', 'utf-8'))
 
         # Inline images — one CID per event
         for i, event in enumerate(events):
@@ -480,13 +501,14 @@ def send_today_reminders(force: bool = False):
         return 0
 
 
-def send_event_email_now(event):
+def send_event_email_now(event, sender_username=None):
+    sender_name = COUPLE_NAMES.get(sender_username, sender_username.title() if sender_username else "Someone")
     results = {}
     for uname, email in COUPLE_EMAILS.items():
         if not email:
             continue
         name = COUPLE_NAMES.get(uname, uname.title())
-        results[name] = _send_digest_smtp([event], email, name)
+        results[name] = _send_digest_smtp([event], email, name, sender_name=sender_name)
     return results
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1729,6 +1751,18 @@ button[kind="header"][title*="menu" i] svg {
   line-height: 1.8;
   padding: 0 0.5rem;
 }
+.arabic {
+  direction: rtl;
+  text-align: right;
+}
+.card-title.arabic, .card-preview.arabic {
+  direction: rtl;
+  text-align: right;
+}
+.detail-title.arabic, .detail-preview.arabic {
+  direction: rtl;
+  text-align: right;
+}
 
 /* ─── LOGIN CARD ───────────────────────────────────── */
 .login-card {
@@ -2033,13 +2067,15 @@ def display_event_card(event, index, global_index):
     else:
         thumb_html = '<div class="thumb-placeholder">🌸</div>'
 
+    card_title_cls = "arabic" if is_arabic(event['title']) else ""
+    card_preview_cls = "arabic" if is_arabic(event['preview']) else ""
     st.markdown(f"""
     <div class="event-card">
         <div class="event-card-thumb">{thumb_html}</div>
         <div class="event-card-body">
-            <div class="card-title">{event['title']}</div>
+            <div class="card-title {card_title_cls}">{event['title']}</div>
             <div class="card-date">📅 {formatted_date}</div>
-            <div class="card-preview">{event['preview']}</div>
+            <div class="card-preview {card_preview_cls}">{event['preview']}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2335,7 +2371,9 @@ def display_calendar_view(events):
 
 def display_event_detail(event):
     """Render full event detail view."""
-    arabic_cls = "arabic" if is_arabic(event["description"]) else ""
+    title_cls = "arabic" if is_arabic(event["title"]) else ""
+    preview_cls = "arabic" if is_arabic(event["preview"]) else ""
+    body_cls = "arabic" if is_arabic(event["description"]) else ""
     formatted_date = event['date'].strftime('%B %d, %Y')
 
     # Hero image / placeholder
@@ -2346,12 +2384,12 @@ def display_event_detail(event):
 
     st.markdown(f"""
         <div class="detail-meta">
-            <div class="detail-title">{event['title']}</div>
+            <div class="detail-title {title_cls}">{event['title']}</div>
             <div class="detail-date">📅 {formatted_date}</div>
-            <div class="detail-preview">{event['preview']}</div>
+            <div class="detail-preview {preview_cls}">{event['preview']}</div>
         </div>
         <div class="detail-divider"></div>
-        <div class="detail-body {arabic_cls}">{event['description']}</div>
+        <div class="detail-body {body_cls}">{event['description']}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2363,7 +2401,7 @@ def display_event_detail(event):
     with action_col1:
         if st.button("✉️ Share Memory", use_container_width=True, type="secondary"):
             with st.spinner("Sending..."):
-                results = send_event_email_now(event)
+                results = send_event_email_now(event, sender_username=st.session_state.get('user'))
                 success_count = sum(1 for v in results.values() if v)
                 if success_count > 0:
                     st.success(f"✉️ Memory sent to {success_count} person/people!")

@@ -502,7 +502,7 @@ def send_today_reminders(force: bool = False):
 
 
 def send_event_email_now(event, sender_username=None):
-    sender_name = COUPLE_NAMES.get(sender_username, sender_username.title() if sender_username else "Someone")
+    sender_name = COUPLE_NAMES.get(sender_username, "Someone") if sender_username else "Someone"
     results = {}
     for uname, email in COUPLE_EMAILS.items():
         if not email:

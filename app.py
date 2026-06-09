@@ -2401,7 +2401,9 @@ def display_event_detail(event):
     with action_col1:
         if st.button("✉️ Share Memory", use_container_width=True, type="secondary"):
             with st.spinner("Sending..."):
-                results = send_event_email_now(event, sender_username=st.session_state.get('user'))
+                sender_user = st.session_state.get('user')
+                sender_uname = sender_user.get('username') if isinstance(sender_user, dict) else sender_user
+                results = send_event_email_now(event, sender_username=sender_uname)
                 success_count = sum(1 for v in results.values() if v)
                 if success_count > 0:
                     st.success(f"✉️ Memory sent to {success_count} person/people!")
